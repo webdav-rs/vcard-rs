@@ -1,5 +1,6 @@
 use std::{io, string::FromUtf8Error};
 use thiserror::Error;
+use url::ParseError;
 
 #[derive(Error, Debug)]
 #[non_exhaustive]
@@ -34,7 +35,14 @@ pub enum VCardError {
     UnknownType { given_type: String },
 
     #[error("Invalid PID parameter. Expected parameter to have the form digit[.digit] (e.g: 1 or 1.2) but got {provided}")]
-    InvalidPID {
-        provided: String,
-    }   
+    InvalidPID { provided: String },
+
+    #[error("Invalid version {0}, only version 4.0 is valid")]
+    InvalidVersion(String),
+
+    #[error("Invalid gender {0}, expected one of (m,f,o,n,u)")]
+    InvalidGenderError(String),
+
+    #[error(transparent)]
+    UrlParseError(#[from] ParseError),
 }

@@ -1,19 +1,13 @@
+use lazy_static;
 use regex::{self, Regex};
 use std::{
-    borrow::BorrowMut,
     cell::RefCell,
-    char,
-    collections::HashMap,
     io::{self, BufRead, Read},
     rc::Rc,
     str::FromStr,
 };
-#[macro_use]
-use lazy_static;
 
-#[macro_use]
 use strum_macros;
-use strum;
 
 use errors::VCardError;
 mod errors;
@@ -31,23 +25,37 @@ pub struct ContentLine {
     pub group: Option<String>,
 }
 
+#[derive(Debug, PartialEq)]
 pub enum VersionValue {
     V3,
     V4,
 }
 
+#[derive(strum_macros::AsRefStr, Debug, PartialEq)]
 pub enum ValueType {
+    #[strum(serialize = "uri")]
     Uri,
+    #[strum(serialize = "text")]
     Text,
+    #[strum(serialize = "date")]
     Date,
+    #[strum(serialize = "time")]
     Time,
+    #[strum(serialize = "date-time")]
     DateTime,
+    #[strum(serialize = "date-and-or-time")]
     DateAndOrTime,
+    #[strum(serialize = "timestamp")]
     Timestamp,
+    #[strum(serialize = "boolean")]
     Boolean,
+    #[strum(serialize = "integer")]
     Integer,
+    #[strum(serialize = "float")]
     Float,
+    #[strum(serialize = "utc-offset")]
     UtcOffset,
+    #[strum(serialize = "language-tag")]
     LanguageTag,
     Proprietary(String),
 }
@@ -100,22 +108,65 @@ pub struct Pid {
     pub second_digit: Option<u8>,
 }
 
+#[derive(strum_macros::AsRefStr, Debug, PartialEq)]
 pub enum Kind {
+    #[strum(serialize = "individual")]
     Individual, //  default
+    #[strum(serialize = "group")]
     Group,
+    #[strum(serialize = "org")]
     Org,
+    #[strum(serialize = "location")]
     Location,
     Proprietary(String),
 }
 
+impl FromStr for Kind {
+    type Err = VCardError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let result = match &s.to_lowercase()[..] {
+            "individual" => Self::Individual,
+            "group" => Self::Group,
+            "org" => Self::Org,
+            "location" => Self::Location,
+            _ => Self::Proprietary(s.into()),
+        };
+        Ok(result)
+    }
+}
+
+#[derive(strum_macros::AsRefStr, Debug, PartialEq)]
 pub enum Gender {
+    #[strum(serialize = "m")]
     Male,
-    Femal,
+    #[strum(serialize = "f")]
+    Female,
+    #[strum(serialize = "o")]
     Other,
+    #[strum(serialize = "n")]
     None,
+    #[strum(serialize = "u")]
     Unknown,
 }
-#[derive(strum_macros::AsRefStr)]
+
+impl FromStr for Gender {
+    type Err = VCardError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let g = match &s.to_lowercase()[..] {
+            "m" => Self::Male,
+            "f" => Self::Female,
+            "o" => Self::Other,
+            "n" => Self::None,
+            "u" => Self::Unknown,
+            _ => return Err(VCardError::InvalidGenderError(s.into())),
+        };
+        Ok(g)
+    }
+}
+
+#[derive(strum_macros::AsRefStr, Debug, PartialEq)]
 pub enum Property {
     #[strum(serialize = "begin")]
     Begin { value: String },
@@ -143,6 +194,7 @@ pub enum Property {
     },
     #[strum(serialize = "n")]
     N {
+        group: Option<String>,
         parameters: Vec<Parameter>,
         surenames: Vec<String>,
         given_names: Vec<String>,
@@ -301,10 +353,10 @@ pub enum Property {
         value: url::Url,
     },
     #[strum(serialize = "clientidmap")]
-    ClientIdMap {
+    ClientPidMap {
         group: Option<String>,
         parameters: Vec<Parameter>,
-        pid: String,
+        pid: u8,
         global_identifier: url::Url,
     },
     #[strum(serialize = "url")]
@@ -375,42 +427,282 @@ impl FromStr for Property {
                     raw_line: line.into(),
                 })?;
         let parameter = captures.name("parameter").map(|m| m.as_str());
-        let value =
-            captures
-                .name("value")
-                .map(|m| m.as_str())
-                .ok_or_else(|| VCardError::InvalidLine {
-                    reason: "no value found",
-                    raw_line: line.into(),
-                })?;
+        let value = captures
+            .name("value")
+            .map(|m| m.as_str().to_string())
+            .ok_or_else(|| VCardError::InvalidLine {
+                reason: "no value found",
+                raw_line: line.into(),
+            })?;
         let name = name.to_lowercase();
-
-        let prop = match &name[..] {
-            _ => {
-                if !name.starts_with("X-") && !name.starts_with("x-") {
-                    return Err(VCardError::InvalidName {
-                        actual_name: name.into(),
-                        raw_line: line.into(),
-                    });
+        let parameters = if let Some(raw_parameter) = parameter {
+            parse_parameters(raw_parameter)?
+        } else {
+            Vec::new()
+        };
+        let prop =
+            match &name[..] {
+                "begin" => Self::Begin { value },
+                "end" => Self::End { value },
+                "version" => {
+                    if value != "4.0" {
+                        return Err(VCardError::InvalidVersion(value));
+                    }
+                    Self::Version {
+                        value: VersionValue::V4,
+                    }
                 }
-
-                let parameters = if let Some(raw_parameter) = parameter {
-                    parse_parameters(raw_parameter)?
-                } else {
-                    Vec::new()
-                };
-                Property::Proprietary {
-                    name,
-                    value: value.into(),
+                "source" => Self::Source {
                     group,
                     parameters,
+                    value,
+                },
+                "kind" => Self::Kind {
+                    group,
+                    parameters,
+                    value: value.parse()?,
+                },
+                "fn" => Self::FN {
+                    parameters,
+                    group,
+                    value,
+                },
+                "n" => {
+                    let mut split = value
+                        .split(";")
+                        .map(|item| item.split(";").map(String::from).collect::<Vec<String>>());
+                    let surenames = split.next().unwrap_or_else(Vec::new);
+                    let given_names = split.next().unwrap_or_else(Vec::new);
+                    let additional_names = split.next().unwrap_or_else(Vec::new);
+                    let honorific_prefixes = split.next().unwrap_or_else(Vec::new);
+                    let honorific_suffixes = split.next().unwrap_or_else(Vec::new);
+                    Self::N {
+                        additional_names,
+                        honorific_prefixes,
+                        honorific_suffixes,
+                        given_names,
+                        surenames,
+                        group,
+                        parameters,
+                    }
                 }
-            }
-        };
+                "nickname" => Self::NickName {
+                    group,
+                    parameters,
+                    value: value.split(",").map(String::from).collect(),
+                },
+                "photo" => Self::Photo {
+                    group,
+                    parameters,
+                    value: value.parse()?,
+                },
+                "bday" => Self::BDay {
+                    group,
+                    parameters,
+                    value,
+                },
+                "anniversary" => Self::Anniversary { group, parameters },
+                "gender" => {
+                    let mut split = value.split(";");
+                    let value = if let Some(r) = split.next().map(Gender::from_str) {
+                        Some(r?)
+                    } else {
+                        None
+                    };
+                    let identity_component = split.next().map(String::from);
+                    Self::Gender {
+                        group,
+                        parameters,
+                        value,
+                        identity_component,
+                    }
+                }
+                "adr" => {
+                    let mut split = value
+                        .split(";")
+                        .map(|item| item.split(",").map(String::from).collect::<Vec<String>>());
+                    let po_box = split.next().unwrap_or_else(|| Vec::new());
+                    let extended_address = split.next().unwrap_or_else(|| Vec::new());
+                    let street = split.next().unwrap_or_else(|| Vec::new());
+                    let city = split.next().unwrap_or_else(|| Vec::new());
+                    let region = split.next().unwrap_or_else(|| Vec::new());
+                    let postal_code = split.next().unwrap_or_else(|| Vec::new());
+                    let country = split.next().unwrap_or_else(|| Vec::new());
+                    Self::Adr {
+                        region,
+                        po_box,
+                        city,
+                        group,
+                        parameters,
+                        extended_address,
+                        street,
+                        postal_code,
+                        country,
+                    }
+                }
+                "tel" => Self::Tel {
+                    group,
+                    parameters,
+                    value,
+                },
+                "email" => Self::Email {
+                    group,
+                    parameters,
+                    value,
+                },
+                "impp" => Self::Impp {
+                    group,
+                    parameters,
+                    value: value.parse()?,
+                },
+                "lang" => Self::Lang {
+                    group,
+                    parameters,
+                    value,
+                },
+                "tz" => Self::Tz {
+                    group,
+                    parameters,
+                    value,
+                },
+                "geo" => Self::Geo {
+                    group,
+                    parameters,
+                    value: value.parse()?,
+                },
+                "title" => Self::Title {
+                    group,
+                    parameters,
+                    value,
+                },
+                "role" => Self::Role {
+                    group,
+                    parameters,
+                    value,
+                },
+                "categories" => Self::Categories {
+                    group,
+                    parameters,
+                    value: value.split(";").map(String::from).collect(),
+                },
+                "org" => Self::Org {
+                    parameters,
+                    group,
+                    value: value.split(";").map(String::from).collect(),
+                },
+                "member" => Self::Member {
+                    parameters,
+                    group,
+                    value: value.parse()?,
+                },
+                "related" => Self::Related {
+                    parameters,
+                    group,
+                    value,
+                },
+                "logo" => Self::Logo {
+                    parameters,
+                    group,
+                    value: value.parse()?,
+                },
+                "note" => Self::Note {
+                    parameters,
+                    group,
+                    value,
+                },
+                "prodid" => Self::ProdId {
+                    parameters,
+                    group,
+                    value,
+                },
+                "rev" => Self::Rev {
+                    parameters,
+                    group,
+                    value,
+                },
+                "sound" => Self::Sound {
+                    parameters,
+                    group,
+                    value: value.parse()?,
+                },
+                "uid" => Self::Uid {
+                    parameters,
+                    group,
+                    value: value.parse()?,
+                },
+                "clientidmap" => {
+                    let mut split = value.split(";");
+                    let pid = split.next().map(u8::from_str).ok_or_else(|| {
+                        VCardError::InvalidLine {
+                            reason:
+                                "expected clientpidmap value to have two parts separated by ';'",
+                            raw_line: value.clone(),
+                        }
+                    })??;
+                    let global_identifier = split.next().map(url::Url::from_str).ok_or_else(
+                        || VCardError::InvalidLine {
+                            reason:
+                                "expected clientpidmap value to have two parts separated by ';'",
+                            raw_line: value.clone(),
+                        },
+                    )??;
+                    Self::ClientPidMap {
+                        global_identifier,
+                        pid,
+                        group,
+                        parameters,
+                    }
+                }
+                "url" => Self::Url {
+                    group,
+                    parameters,
+                    value: value.parse()?,
+                },
+                "key" => Self::Key {
+                    group,
+                    parameters,
+                    value,
+                },
+                "fburl" => Self::FbUrl {
+                    group,
+                    parameters,
+                    value: value.parse()?,
+                },
+                "caladuri" => Self::CalAdUri {
+                    group,
+                    parameters,
+                    value: value.parse()?,
+                },
+                "caluri" => Self::CalUri {
+                    group,
+                    parameters,
+                    value: value.parse()?,
+                },
+                "xml" => Self::Xml {
+                    value,
+                    group,
+                    parameters,
+                },
+                _ => {
+                    if !name.starts_with("X-") && !name.starts_with("x-") {
+                        return Err(VCardError::InvalidName {
+                            actual_name: name.into(),
+                            raw_line: line.into(),
+                        });
+                    }
+                    Property::Proprietary {
+                        name,
+                        value: value.into(),
+                        group,
+                        parameters,
+                    }
+                }
+            };
         Ok(prop)
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub enum Parameter {
     Language(String),
     Value(ValueType),
