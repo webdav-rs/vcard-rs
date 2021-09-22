@@ -102,7 +102,7 @@ impl FromStr for ValueType {
         Ok(t)
     }
 }
-
+#[derive(Debug, PartialEq)]
 pub struct Pid {
     pub first_digit: u8,
     pub second_digit: Option<u8>,
@@ -137,7 +137,7 @@ impl FromStr for Kind {
 }
 
 #[derive(strum_macros::AsRefStr, Debug, PartialEq)]
-pub enum Gender {
+pub enum Sex {
     #[strum(serialize = "m")]
     Male,
     #[strum(serialize = "f")]
@@ -150,7 +150,13 @@ pub enum Gender {
     Unknown,
 }
 
-impl FromStr for Gender {
+#[derive(Debug, PartialEq)]
+pub struct Gender {
+    pub sex: Option<Sex>,
+    pub identity_component: Option<String>,
+}
+
+impl FromStr for Sex {
     type Err = VCardError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -166,6 +172,369 @@ impl FromStr for Gender {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub struct Version {
+    pub value: VersionValue,
+}
+#[derive(Debug, PartialEq)]
+pub struct Source {
+    pub group: Option<String>,
+    pub pid: Option<Pid>,
+    pub altid: String,
+    pub mediatype: Option<String>,
+    pub value: url::Url,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct FN {
+    pub altid: String,
+    pub type_param: Option<ValueType>,
+    pub language: Option<String>,
+    pub pref: Option<u8>,
+    pub value: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct N {
+    pub altid: String,
+    pub sort_as: Vec<String>,
+    pub group: Option<String>,
+    pub surenames: Vec<String>,
+    pub given_names: Vec<String>,
+    pub additional_names: Vec<String>,
+    pub honorific_prefixes: Vec<String>,
+    pub honorific_suffixes: Vec<String>,
+}
+#[derive(Debug, PartialEq)]
+pub struct Nickname {
+    pub group: Option<String>,
+    pub altid: String,
+    pub type_param: Option<ValueType>,
+    pub language: Option<String>,
+    pub pref: Option<u8>,
+    pub pid: Option<Pid>,
+    pub value: Vec<String>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Photo {
+    pub group: Option<String>,
+    pub altid: String,
+    pub type_param: Option<ValueType>,
+    pub mediatype: Option<String>,
+    pub pref: Option<u8>,
+    pub pid: Option<Pid>,
+    pub value: url::Url,
+}
+#[derive(Debug, PartialEq)]
+pub struct BDay {
+    pub altid: String,
+    pub calscale: Option<String>,
+    pub type_param: Option<ValueType>,
+    pub language: Option<String>,
+    pub value: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Anniversary {
+    pub altid: String,
+    pub calscale: Option<String>,
+    pub type_param: Option<ValueType>,
+    pub value: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Address {
+    pub group: Option<String>,
+    pub altid: String,
+    pub label: Option<String>,
+    pub language: Option<String>,
+    pub geo: Option<String>,
+    pub tz: Option<String>,
+    pub pid: Option<Pid>,
+    pub pref: Option<u8>,
+    pub type_param: Option<ValueType>,
+    pub po_box: Vec<String>,
+    pub extended_address: Vec<String>,
+    pub street: Vec<String>,
+    pub city: Vec<String>,
+    pub region: Vec<String>,
+    pub postal_code: Vec<String>,
+    pub country: Vec<String>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Tel {
+    pub type_param: Option<ValueType>,
+    pub pid: Option<Pid>,
+    pub pref: Option<u8>,
+    pub altid: String,
+    pub value: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Email {
+    pub group: Option<String>,
+    pub altid: String,
+    pub pid: Option<Pid>,
+    pub pref: Option<u8>,
+    pub type_param: Option<ValueType>,
+    pub value: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Impp {
+    pub group: Option<String>,
+    pub altid: String,
+    pub pid: Option<Pid>,
+    pub pref: Option<u8>,
+    pub mediatype: Option<String>,
+    pub type_param: Option<ValueType>,
+    pub value: String,
+}
+#[derive(Debug, PartialEq)]
+pub struct Language {
+    pub group: Option<String>,
+    pub altid: String,
+    pub pid: Option<Pid>,
+    pub pref: Option<u8>,
+    pub type_param: Option<ValueType>,
+    pub value: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Tz {
+    pub group: Option<String>,
+
+    pub altid: String,
+    pub pid: Option<Pid>,
+    pub pref: Option<u8>,
+    pub type_param: Option<ValueType>,
+    pub mediatype: Option<String>,
+
+    pub value: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Geo {
+    pub group: Option<String>,
+
+    pub altid: String,
+    pub pid: Option<Pid>,
+    pub pref: Option<u8>,
+    pub type_param: Option<ValueType>,
+    pub mediatype: Option<String>,
+
+    pub value: url::Url,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Title {
+    pub group: Option<String>,
+
+    pub altid: String,
+    pub pid: Option<Pid>,
+    pub pref: Option<u8>,
+    pub type_param: Option<ValueType>,
+    pub language: Option<String>,
+
+    pub value: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Role {
+    pub group: Option<String>,
+
+    pub altid: String,
+    pub pid: Option<Pid>,
+    pub pref: Option<u8>,
+    pub type_param: Option<ValueType>,
+    pub language: Option<String>,
+
+    pub value: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Logo {
+    pub group: Option<String>,
+
+    pub altid: String,
+    pub pid: Option<Pid>,
+    pub pref: Option<u8>,
+    pub type_param: Option<ValueType>,
+    pub language: Option<String>,
+    pub mediatype: Option<String>,
+
+    pub value: url::Url,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Org {
+    pub group: Option<String>,
+
+    pub altid: String,
+    pub pid: Option<Pid>,
+    pub pref: Option<u8>,
+    pub type_param: Option<ValueType>,
+    pub language: Option<String>,
+    pub sort_as: Vec<String>,
+
+    pub value: Vec<String>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Member {
+    pub group: Option<String>,
+
+    pub altid: String,
+    pub pid: Option<Pid>,
+    pub pref: Option<u8>,
+    pub mediatype: Option<String>,
+
+    pub value: url::Url,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Related {
+    pub group: Option<String>,
+
+    pub altid: String,
+    pub pid: Option<Pid>,
+    pub pref: Option<u8>,
+    pub type_param: Option<ValueType>,
+    pub language: Option<String>,
+    pub mediatype: Option<String>,
+
+    pub value: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Categories {
+    pub group: Option<String>,
+
+    pub altid: String,
+    pub pid: Option<Pid>,
+    pub pref: Option<u8>,
+    pub type_param: Option<ValueType>,
+
+    pub value: Vec<String>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Note {
+    pub group: Option<String>,
+
+    pub altid: String,
+    pub pid: Option<Pid>,
+    pub pref: Option<u8>,
+    pub type_param: Option<ValueType>,
+    pub language: Option<String>,
+
+    pub value: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ProdId {
+    pub group: Option<String>,
+    pub value: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Rev {
+    pub group: Option<String>,
+    pub value: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Sound {
+    pub group: Option<String>,
+
+    pub altid: String,
+    pub pid: Option<Pid>,
+    pub pref: Option<u8>,
+    pub type_param: Option<ValueType>,
+    pub language: Option<String>,
+    pub mediatype: Option<String>,
+
+    pub value: url::Url,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Uid {
+    pub group: Option<String>,
+    pub type_param: Option<ValueType>,
+    pub value: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ClientPidMap {
+    pub group: Option<String>,
+    pub pid_digit: u8,
+    pub value: url::Url,
+}
+#[derive(Debug, PartialEq)]
+pub struct VcardURL {
+    pub group: Option<String>,
+    pub altid: String,
+    pub pid: Option<Pid>,
+    pub pref: Option<u8>,
+    pub type_param: Option<ValueType>,
+    pub mediatype: Option<String>,
+    pub value: url::Url,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct FbURL {
+    pub group: Option<String>,
+    pub altid: String,
+    pub pid: Option<Pid>,
+    pub pref: Option<u8>,
+    pub type_param: Option<ValueType>,
+    pub mediatype: Option<String>,
+    pub value: url::Url,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct CalAdURI {
+    pub group: Option<String>,
+    pub altid: String,
+    pub pid: Option<Pid>,
+    pub pref: Option<u8>,
+    pub type_param: Option<ValueType>,
+    pub mediatype: Option<String>,
+    pub value: url::Url,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct CalURI {
+    pub group: Option<String>,
+    pub altid: String,
+    pub pid: Option<Pid>,
+    pub pref: Option<u8>,
+    pub type_param: Option<ValueType>,
+    pub mediatype: Option<String>,
+    pub value: url::Url,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Key {
+    pub group: Option<String>,
+
+    pub altid: String,
+    pub pid: Option<Pid>,
+    pub pref: Option<u8>,
+    pub type_param: Option<ValueType>,
+    pub mediatype: Option<String>,
+
+    pub value: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Xml {
+    pub group: Option<String>,
+    pub value: String,
+}
+
 #[derive(strum_macros::AsRefStr, Debug, PartialEq)]
 pub enum Property {
     #[strum(serialize = "begin")]
@@ -173,228 +542,77 @@ pub enum Property {
     #[strum(serialize = "end")]
     End { value: String },
     #[strum(serialize = "version")]
-    Version { value: VersionValue },
+    Version(Version),
     #[strum(serialize = "source")]
-    Source {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: String,
-    },
+    Source(Source),
     #[strum(serialize = "kind")]
-    Kind {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: Kind, // Individual is default
-    },
+    Kind(Kind),
     #[strum(serialize = "fn")]
-    FN {
-        parameters: Vec<Parameter>,
-        group: Option<String>,
-        value: String,
-    },
+    FN(FN),
     #[strum(serialize = "n")]
-    N {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        surenames: Vec<String>,
-        given_names: Vec<String>,
-        additional_names: Vec<String>,
-        honorific_prefixes: Vec<String>,
-        honorific_suffixes: Vec<String>,
-    },
+    N(N),
     #[strum(serialize = "nickname")]
-    NickName {
-        group: Option<String>,
-        value: Vec<String>,
-        parameters: Vec<Parameter>,
-    },
+    NickName(Nickname),
     #[strum(serialize = "photo")]
-    Photo {
-        group: Option<String>,
-        value: url::Url,
-        parameters: Vec<Parameter>,
-    },
+    Photo(Photo),
     #[strum(serialize = "bday")]
-    BDay {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: String,
-    },
+    BDay(BDay),
     #[strum(serialize = "anniversary")]
-    Anniversary {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-    },
+    Anniversary(Anniversary),
     #[strum(serialize = "gender")]
-    Gender {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: Option<Gender>,
-        identity_component: Option<String>,
-    },
+    Gender(Gender),
     #[strum(serialize = "adr")]
-    Adr {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        po_box: Vec<String>,
-        extended_address: Vec<String>,
-        street: Vec<String>,
-        city: Vec<String>,
-        region: Vec<String>,
-        postal_code: Vec<String>,
-        country: Vec<String>,
-    },
+    Adr(Address),
     #[strum(serialize = "tel")]
-    Tel {
-        parameters: Vec<Parameter>,
-        group: Option<String>,
-        value: String,
-    },
+    Tel(Tel),
     #[strum(serialize = "email")]
-    Email {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: String,
-    },
+    Email(Email),
     #[strum(serialize = "impp")]
-    Impp {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: url::Url,
-    },
+    Impp(Impp),
     #[strum(serialize = "lang")]
-    Lang {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: String,
-    },
+    Lang(Language),
     #[strum(serialize = "tz")]
-    Tz {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: String,
-    },
+    Tz(Tz),
     #[strum(serialize = "geo")]
-    Geo {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: url::Url,
-    },
+    Geo(Geo),
     #[strum(serialize = "title")]
-    Title {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: String,
-    },
+    Title(Title),
     #[strum(serialize = "role")]
-    Role {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: String,
-    },
+    Role(Role),
     #[strum(serialize = "logo")]
-    Logo {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: url::Url,
-    },
+    Logo(Logo),
     #[strum(serialize = "org")]
-    Org {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: Vec<String>,
-    },
+    Org(Org),
     #[strum(serialize = "member")]
-    Member {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: url::Url,
-    },
+    Member(Member),
     #[strum(serialize = "related")]
-    Related {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: String,
-    },
+    Related(Related),
     #[strum(serialize = "categories")]
-    Categories {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: Vec<String>,
-    },
+    Categories(Categories),
     #[strum(serialize = "note")]
-    Note {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: String,
-    },
+    Note(Note),
     #[strum(serialize = "prodid")]
-    ProdId {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: String,
-    },
+    ProdId(ProdId),
     #[strum(serialize = "rev")]
-    Rev {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: String,
-    },
+    Rev(Rev),
     #[strum(serialize = "sound")]
-    Sound {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: url::Url,
-    },
+    Sound(Sound),
     #[strum(serialize = "uid")]
-    Uid {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: url::Url,
-    },
+    Uid(Uid),
     #[strum(serialize = "clientidmap")]
-    ClientPidMap {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        pid: u8,
-        global_identifier: url::Url,
-    },
+    ClientPidMap(ClientPidMap),
     #[strum(serialize = "url")]
-    Url {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: url::Url,
-    },
+    Url(VcardURL),
     #[strum(serialize = "key")]
-    Key {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: String,
-    },
+    Key(Key),
     #[strum(serialize = "fburl")]
-    FbUrl {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: url::Url,
-    },
+    FbUrl(FbURL),
     #[strum(serialize = "caladuri")]
-    CalAdUri {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: url::Url,
-    },
+    CalAdUri(CalAdURI),
     #[strum(serialize = "caluri")]
-    CalUri {
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-        value: url::Url,
-    },
+    CalUri(CalURI),
     #[strum(serialize = "xml")]
-    Xml {
-        value: String,
-        group: Option<String>,
-        parameters: Vec<Parameter>,
-    },
+    Xml(Xml),
     Proprietary {
         name: String,
         group: Option<String>,
@@ -440,6 +658,42 @@ impl FromStr for Property {
         } else {
             Vec::new()
         };
+
+        let mut pid = None;
+        let mut altid = None;
+        let mut mediatype = None;
+        let mut tz = None;
+        let mut geo = None;
+        let mut sort_as = None;
+        let mut calscale = None;
+        let mut type_param = None;
+        let mut pref = None;
+        let mut language = None;
+        let mut label = None;
+        let mut proprietary_parameters = Vec::new();
+        for param in parameters {
+            match param {
+                Parameter::Pid(p) => pid = Some(p),
+                Parameter::AltId(a) => altid = Some(a),
+                Parameter::MediaType(m) => mediatype = Some(m),
+                Parameter::TimeZone(t) => tz = Some(t),
+                Parameter::Geo(g) => geo = Some(g),
+                Parameter::SortAs(s) => sort_as = Some(s),
+                Parameter::CalScale(c) => calscale = Some(c),
+                Parameter::Type(t) => type_param = Some(ValueType::from_str(&t[..])?),
+                Parameter::Language(l) => language = Some(l),
+                Parameter::Pref(p) => pref = Some(p),
+                Parameter::Label(l) => label = Some(l),
+                Parameter::Proprietary(p) => {
+                    proprietary_parameters.push(Parameter::Proprietary(p))
+                }
+                _ => return Err(VCardError::UnknownParameter(param.as_ref().into())),
+            }
+        }
+
+        let sort_as = sort_as.unwrap_or_default();
+        let altid = altid.unwrap_or_default();
+
         let prop =
             match &name[..] {
                 "begin" => Self::Begin { value },
@@ -448,25 +702,25 @@ impl FromStr for Property {
                     if value != "4.0" {
                         return Err(VCardError::InvalidVersion(value));
                     }
-                    Self::Version {
+                    Self::Version(Version {
                         value: VersionValue::V4,
-                    }
+                    })
                 }
-                "source" => Self::Source {
+                "source" => Self::Source(Source {
+                    pid,
+                    altid,
+                    mediatype,
                     group,
-                    parameters,
-                    value,
-                },
-                "kind" => Self::Kind {
-                    group,
-                    parameters,
                     value: value.parse()?,
-                },
-                "fn" => Self::FN {
-                    parameters,
-                    group,
+                }),
+                "kind" => Self::Kind(value.parse()?),
+                "fn" => Self::FN(FN {
+                    altid,
+                    type_param,
                     value,
-                },
+                    language,
+                    pref,
+                }),
                 "n" => {
                     let mut split = value
                         .split(";")
@@ -476,46 +730,60 @@ impl FromStr for Property {
                     let additional_names = split.next().unwrap_or_else(Vec::new);
                     let honorific_prefixes = split.next().unwrap_or_else(Vec::new);
                     let honorific_suffixes = split.next().unwrap_or_else(Vec::new);
-                    Self::N {
+                    Self::N(N {
+                        sort_as,
+                        altid,
                         additional_names,
                         honorific_prefixes,
                         honorific_suffixes,
                         given_names,
                         surenames,
                         group,
-                        parameters,
-                    }
+                    })
                 }
-                "nickname" => Self::NickName {
+                "nickname" => Self::NickName(Nickname {
+                    altid,
+                    pref,
+                    type_param,
+                    language,
+                    pid,
                     group,
-                    parameters,
                     value: value.split(",").map(String::from).collect(),
-                },
-                "photo" => Self::Photo {
+                }),
+                "photo" => Self::Photo(Photo {
                     group,
-                    parameters,
+                    altid,
+                    pid,
+                    mediatype,
+                    type_param,
+                    pref,
                     value: value.parse()?,
-                },
-                "bday" => Self::BDay {
-                    group,
-                    parameters,
+                }),
+                "bday" => Self::BDay(BDay {
+                    altid,
+                    calscale,
+                    language,
+                    type_param,
                     value,
-                },
-                "anniversary" => Self::Anniversary { group, parameters },
+                }),
+                "anniversary" => Self::Anniversary(Anniversary {
+                    altid,
+                    calscale,
+                    type_param,
+                    value,
+                }),
                 "gender" => {
                     let mut split = value.split(";");
-                    let value = if let Some(r) = split.next().map(Gender::from_str) {
+                    let value = if let Some(r) = split.next().map(Sex::from_str) {
                         Some(r?)
                     } else {
                         None
                     };
                     let identity_component = split.next().map(String::from);
-                    Self::Gender {
-                        group,
-                        parameters,
-                        value,
+                    Self::Gender(Gender {
+                        sex: value,
                         identity_component,
-                    }
+                    })
                 }
                 "adr" => {
                     let mut split = value
@@ -528,108 +796,166 @@ impl FromStr for Property {
                     let region = split.next().unwrap_or_else(|| Vec::new());
                     let postal_code = split.next().unwrap_or_else(|| Vec::new());
                     let country = split.next().unwrap_or_else(|| Vec::new());
-                    Self::Adr {
+                    Self::Adr(Address {
+                        altid,
+                        pid,
+                        label,
+                        language,
+                        geo,
+                        tz,
+                        type_param,
+                        pref,
                         region,
                         po_box,
                         city,
                         group,
-                        parameters,
                         extended_address,
                         street,
                         postal_code,
                         country,
-                    }
+                    })
                 }
-                "tel" => Self::Tel {
-                    group,
-                    parameters,
+                "tel" => Self::Tel(Tel {
+                    type_param,
+                    pid,
+                    pref,
+                    altid,
                     value,
-                },
-                "email" => Self::Email {
+                }),
+                "email" => Self::Email(Email {
+                    altid,
                     group,
-                    parameters,
+                    pid,
+                    pref,
+                    type_param,
                     value,
-                },
-                "impp" => Self::Impp {
+                }),
+                "impp" => Self::Impp(Impp {
                     group,
-                    parameters,
+                    altid,
+                    pid,
+                    pref,
+                    type_param,
+                    mediatype,
+                    value,
+                }),
+
+                "lang" => Self::Lang(Language {
+                    altid,
+                    pid,
+                    pref,
+                    type_param,
+                    group,
+                    value,
+                }),
+                "tz" => Self::Tz(Tz {
+                    altid,
+                    pid,
+                    pref,
+                    type_param,
+                    mediatype,
+                    group,
+                    value,
+                }),
+                "geo" => Self::Geo(Geo {
+                    altid,
+                    pid,
+                    pref,
+                    type_param,
+                    mediatype,
+                    group,
                     value: value.parse()?,
-                },
-                "lang" => Self::Lang {
+                }),
+                "title" => Self::Title(Title {
+                    altid,
+                    pid,
+                    pref,
+                    type_param,
+                    language,
                     group,
-                    parameters,
                     value,
-                },
-                "tz" => Self::Tz {
+                }),
+                "role" => Self::Role(Role {
+                    altid,
+                    pid,
+                    pref,
+                    type_param,
+                    language,
                     group,
-                    parameters,
                     value,
-                },
-                "geo" => Self::Geo {
+                }),
+                "categories" => Self::Categories(Categories {
+                    altid,
+                    pid,
+                    pref,
+                    type_param,
                     group,
-                    parameters,
-                    value: value.parse()?,
-                },
-                "title" => Self::Title {
-                    group,
-                    parameters,
-                    value,
-                },
-                "role" => Self::Role {
-                    group,
-                    parameters,
-                    value,
-                },
-                "categories" => Self::Categories {
-                    group,
-                    parameters,
                     value: value.split(";").map(String::from).collect(),
-                },
-                "org" => Self::Org {
-                    parameters,
+                }),
+                "org" => Self::Org(Org {
+                    altid,
+                    pid,
+                    pref,
+                    type_param,
+                    language,
+                    sort_as,
                     group,
                     value: value.split(";").map(String::from).collect(),
-                },
-                "member" => Self::Member {
-                    parameters,
+                }),
+                "member" => Self::Member(Member {
+                    altid,
+                    pid,
+                    pref,
                     group,
+                    mediatype,
                     value: value.parse()?,
-                },
-                "related" => Self::Related {
-                    parameters,
+                }),
+                "related" => Self::Related(Related {
+                    altid,
+                    pid,
+                    pref,
+                    type_param,
+                    language,
+                    mediatype,
                     group,
                     value,
-                },
-                "logo" => Self::Logo {
-                    parameters,
+                }),
+                "logo" => Self::Logo(Logo {
+                    altid,
+                    pid,
+                    pref,
+                    type_param,
+                    language,
+                    mediatype,
                     group,
                     value: value.parse()?,
-                },
-                "note" => Self::Note {
-                    parameters,
+                }),
+                "note" => Self::Note(Note {
+                    altid,
+                    pid,
+                    pref,
+                    type_param,
+                    language,
                     group,
                     value,
-                },
-                "prodid" => Self::ProdId {
-                    parameters,
-                    group,
-                    value,
-                },
-                "rev" => Self::Rev {
-                    parameters,
-                    group,
-                    value,
-                },
-                "sound" => Self::Sound {
-                    parameters,
+                }),
+                "prodid" => Self::ProdId(ProdId { group, value }),
+                "rev" => Self::Rev(Rev { group, value }),
+                "sound" => Self::Sound(Sound {
+                    altid,
+                    pid,
+                    pref,
+                    type_param,
+                    language,
+                    mediatype,
                     group,
                     value: value.parse()?,
-                },
-                "uid" => Self::Uid {
-                    parameters,
+                }),
+                "uid" => Self::Uid(Uid {
+                    type_param,
                     group,
-                    value: value.parse()?,
-                },
+                    value,
+                }),
                 "clientidmap" => {
                     let mut split = value.split(";");
                     let pid = split.next().map(u8::from_str).ok_or_else(|| {
@@ -646,43 +972,58 @@ impl FromStr for Property {
                             raw_line: value.clone(),
                         },
                     )??;
-                    Self::ClientPidMap {
-                        global_identifier,
-                        pid,
+                    Self::ClientPidMap(ClientPidMap {
+                        value: global_identifier,
+                        pid_digit: pid,
                         group,
-                        parameters,
-                    }
+                    })
                 }
-                "url" => Self::Url {
+                "url" => Self::Url(VcardURL {
                     group,
-                    parameters,
+                    altid,
+                    pid,
+                    pref,
+                    type_param,
+                    mediatype,
                     value: value.parse()?,
-                },
-                "key" => Self::Key {
+                }),
+                "key" => Self::Key(Key {
                     group,
-                    parameters,
+                    altid,
+                    pid,
+                    pref,
+                    type_param,
+                    mediatype,
                     value,
-                },
-                "fburl" => Self::FbUrl {
+                }),
+                "fburl" => Self::FbUrl(FbURL {
                     group,
-                    parameters,
+                    altid,
+                    pid,
+                    pref,
+                    type_param,
+                    mediatype,
                     value: value.parse()?,
-                },
-                "caladuri" => Self::CalAdUri {
+                }),
+                "caladuri" => Self::CalAdUri(CalAdURI {
                     group,
-                    parameters,
+                    altid,
+                    pid,
+                    pref,
+                    type_param,
+                    mediatype,
                     value: value.parse()?,
-                },
-                "caluri" => Self::CalUri {
+                }),
+                "caluri" => Self::CalUri(CalURI {
                     group,
-                    parameters,
+                    altid,
+                    pid,
+                    pref,
+                    type_param,
+                    mediatype,
                     value: value.parse()?,
-                },
-                "xml" => Self::Xml {
-                    value,
-                    group,
-                    parameters,
-                },
+                }),
+                "xml" => Self::Xml(Xml { value, group }),
                 _ => {
                     if !name.starts_with("X-") && !name.starts_with("x-") {
                         return Err(VCardError::InvalidName {
@@ -690,11 +1031,51 @@ impl FromStr for Property {
                             raw_line: line.into(),
                         });
                     }
+
+                    // let mut language = None;
+
+                    proprietary_parameters.push(Parameter::AltId(altid));
+                    if let Some(pid) = pid {
+                        proprietary_parameters.push(Parameter::Pid(pid));
+                    }
+                    if let Some(mediatype) = mediatype {
+                        proprietary_parameters.push(Parameter::MediaType(mediatype));
+                    }
+                    if let Some(tz) = tz {
+                        proprietary_parameters.push(Parameter::TimeZone(tz));
+                    }
+
+                    if let Some(geo) = geo {
+                        proprietary_parameters.push(Parameter::Geo(geo));
+                    }
+
+                    proprietary_parameters.push(Parameter::SortAs(sort_as));
+
+                    if let Some(calscale) = calscale {
+                        proprietary_parameters.push(Parameter::CalScale(calscale));
+                    }
+
+                    if let Some(label) = label {
+                        proprietary_parameters.push(Parameter::Label(label));
+                    }
+
+                    if let Some(t) = type_param {
+                        proprietary_parameters.push(Parameter::Type(t.as_ref().into()));
+                    }
+
+                    if let Some(pref) = pref {
+                        proprietary_parameters.push(Parameter::Pref(pref));
+                    }
+
+                    if let Some(l) = language {
+                        proprietary_parameters.push(Parameter::Language(l));
+                    }
+
                     Property::Proprietary {
                         name,
                         value: value.into(),
                         group,
-                        parameters,
+                        parameters: proprietary_parameters,
                     }
                 }
             };
@@ -702,16 +1083,14 @@ impl FromStr for Property {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, strum_macros::AsRefStr)]
 pub enum Parameter {
+    Label(String),
     Language(String),
     Value(ValueType),
     Pref(u8),
     AltId(String),
-    Pid {
-        first_digit: u8,
-        second_digit: Option<u8>,
-    },
+    Pid(Pid),
     Type(String),
     MediaType(String),
     CalScale(String),
@@ -758,10 +1137,10 @@ impl FromStr for Parameter {
                 } else {
                     None
                 };
-                Parameter::Pid {
+                Parameter::Pid(Pid {
                     first_digit,
                     second_digit,
-                }
+                })
             }
             TYPE => Self::Type(v.into()),
             MEDIATYPE => Self::MediaType(v.into()),

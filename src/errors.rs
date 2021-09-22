@@ -45,4 +45,7 @@ pub enum VCardError {
 
     #[error(transparent)]
     UrlParseError(#[from] ParseError),
+
+    #[error("Unknown parameter {0}")]
+    UnknownParameter(String),
 }
