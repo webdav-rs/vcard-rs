@@ -32,7 +32,7 @@ pub enum VersionValue {
 }
 
 #[derive(strum_macros::AsRefStr, Debug, PartialEq)]
-pub enum ValueType {
+pub enum ValueDataType {
     #[strum(serialize = "uri")]
     Uri,
     #[strum(serialize = "text")]
@@ -73,7 +73,7 @@ const FLOAT: &str = "float";
 const UTC_OFFSET: &str = "utc-offset";
 const LANGUAGE_TAG: &str = "language-tag";
 
-impl FromStr for ValueType {
+impl FromStr for ValueDataType {
     type Err = VCardError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -188,7 +188,8 @@ pub struct Source {
 #[derive(Debug, PartialEq)]
 pub struct FN {
     pub altid: String,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
+    pub type_param: Vec<String>,
     pub language: Option<String>,
     pub pref: Option<u8>,
     pub value: String,
@@ -209,7 +210,9 @@ pub struct N {
 pub struct Nickname {
     pub group: Option<String>,
     pub altid: String,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
+    pub type_param: Vec<String>,
+
     pub language: Option<String>,
     pub pref: Option<u8>,
     pub pid: Option<Pid>,
@@ -220,7 +223,8 @@ pub struct Nickname {
 pub struct Photo {
     pub group: Option<String>,
     pub altid: String,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
+    pub type_param: Vec<String>,
     pub mediatype: Option<String>,
     pub pref: Option<u8>,
     pub pid: Option<Pid>,
@@ -230,7 +234,7 @@ pub struct Photo {
 pub struct BDay {
     pub altid: String,
     pub calscale: Option<String>,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
     pub language: Option<String>,
     pub value: String,
 }
@@ -239,7 +243,7 @@ pub struct BDay {
 pub struct Anniversary {
     pub altid: String,
     pub calscale: Option<String>,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
     pub value: String,
 }
 
@@ -253,7 +257,9 @@ pub struct Address {
     pub tz: Option<String>,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
+    pub type_param: Vec<String>,
+
     pub po_box: Vec<String>,
     pub extended_address: Vec<String>,
     pub street: Vec<String>,
@@ -265,7 +271,9 @@ pub struct Address {
 
 #[derive(Debug, PartialEq)]
 pub struct Tel {
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
+    pub type_param: Vec<String>,
+
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
     pub altid: String,
@@ -278,7 +286,9 @@ pub struct Email {
     pub altid: String,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
+    pub type_param: Vec<String>,
+
     pub value: String,
 }
 
@@ -289,7 +299,9 @@ pub struct Impp {
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
     pub mediatype: Option<String>,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
+    pub type_param: Vec<String>,
+
     pub value: String,
 }
 #[derive(Debug, PartialEq)]
@@ -298,7 +310,9 @@ pub struct Language {
     pub altid: String,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
+    pub type_param: Vec<String>,
+
     pub value: String,
 }
 
@@ -309,7 +323,9 @@ pub struct Tz {
     pub altid: String,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
+    pub type_param: Vec<String>,
+
     pub mediatype: Option<String>,
 
     pub value: String,
@@ -322,7 +338,9 @@ pub struct Geo {
     pub altid: String,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
+    pub type_param: Vec<String>,
+
     pub mediatype: Option<String>,
 
     pub value: url::Url,
@@ -335,7 +353,9 @@ pub struct Title {
     pub altid: String,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
+    pub type_param: Vec<String>,
+
     pub language: Option<String>,
 
     pub value: String,
@@ -348,7 +368,9 @@ pub struct Role {
     pub altid: String,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
+    pub type_param: Vec<String>,
+
     pub language: Option<String>,
 
     pub value: String,
@@ -361,7 +383,9 @@ pub struct Logo {
     pub altid: String,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
+    pub type_param: Vec<String>,
+
     pub language: Option<String>,
     pub mediatype: Option<String>,
 
@@ -375,7 +399,9 @@ pub struct Org {
     pub altid: String,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
+    pub type_param: Vec<String>,
+
     pub language: Option<String>,
     pub sort_as: Vec<String>,
 
@@ -401,7 +427,9 @@ pub struct Related {
     pub altid: String,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
+    pub type_param: Vec<String>,
+
     pub language: Option<String>,
     pub mediatype: Option<String>,
 
@@ -415,7 +443,8 @@ pub struct Categories {
     pub altid: String,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
+    pub type_param: Vec<String>,
 
     pub value: Vec<String>,
 }
@@ -427,7 +456,9 @@ pub struct Note {
     pub altid: String,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
+    pub type_param: Vec<String>,
+
     pub language: Option<String>,
 
     pub value: String,
@@ -452,7 +483,9 @@ pub struct Sound {
     pub altid: String,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
+    pub type_param: Vec<String>,
+
     pub language: Option<String>,
     pub mediatype: Option<String>,
 
@@ -462,7 +495,7 @@ pub struct Sound {
 #[derive(Debug, PartialEq)]
 pub struct Uid {
     pub group: Option<String>,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
     pub value: String,
 }
 
@@ -478,7 +511,9 @@ pub struct VcardURL {
     pub altid: String,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
+    pub type_param: Vec<String>,
+
     pub mediatype: Option<String>,
     pub value: url::Url,
 }
@@ -489,7 +524,9 @@ pub struct FbURL {
     pub altid: String,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
+    pub type_param: Vec<String>,
+
     pub mediatype: Option<String>,
     pub value: url::Url,
 }
@@ -500,7 +537,9 @@ pub struct CalAdURI {
     pub altid: String,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
+    pub type_param: Vec<String>,
+
     pub mediatype: Option<String>,
     pub value: url::Url,
 }
@@ -511,7 +550,8 @@ pub struct CalURI {
     pub altid: String,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
+    pub type_param: Vec<String>,
     pub mediatype: Option<String>,
     pub value: url::Url,
 }
@@ -523,7 +563,9 @@ pub struct Key {
     pub altid: String,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
-    pub type_param: Option<ValueType>,
+    pub value_data_type: Option<ValueDataType>,
+    pub type_param: Vec<String>,
+
     pub mediatype: Option<String>,
 
     pub value: String,
@@ -666,7 +708,8 @@ impl FromStr for Property {
         let mut geo = None;
         let mut sort_as = None;
         let mut calscale = None;
-        let mut type_param = None;
+        let mut type_param: Vec<String> = Vec::new();
+        let mut value_data_type = None;
         let mut pref = None;
         let mut language = None;
         let mut label = None;
@@ -680,13 +723,14 @@ impl FromStr for Property {
                 Parameter::Geo(g) => geo = Some(g),
                 Parameter::SortAs(s) => sort_as = Some(s),
                 Parameter::CalScale(c) => calscale = Some(c),
-                Parameter::Type(t) => type_param = Some(ValueType::from_str(&t[..])?),
+                Parameter::Value(t) => value_data_type = Some(t),
+                Parameter::Type(mut t) => {
+                    type_param.append(&mut t);
+                }
                 Parameter::Language(l) => language = Some(l),
                 Parameter::Pref(p) => pref = Some(p),
                 Parameter::Label(l) => label = Some(l),
-                Parameter::Proprietary(p) => {
-                    proprietary_parameters.push(Parameter::Proprietary(p))
-                }
+                Parameter::Proprietary(p) => proprietary_parameters.push(Parameter::Proprietary(p)),
                 _ => return Err(VCardError::UnknownParameter(param.as_ref().into())),
             }
         }
@@ -699,12 +743,12 @@ impl FromStr for Property {
                 "begin" => Self::Begin { value },
                 "end" => Self::End { value },
                 "version" => {
-                    if value != "4.0" {
-                        return Err(VCardError::InvalidVersion(value));
-                    }
-                    Self::Version(Version {
-                        value: VersionValue::V4,
-                    })
+                    let value = match &value[..] {
+                        "4.0" => VersionValue::V4,
+                        "3.0" => VersionValue::V3,
+                        _ => return Err(VCardError::InvalidVersion(value)),
+                    };
+                    Self::Version(Version { value })
                 }
                 "source" => Self::Source(Source {
                     pid,
@@ -717,6 +761,7 @@ impl FromStr for Property {
                 "fn" => Self::FN(FN {
                     altid,
                     type_param,
+                    value_data_type,
                     value,
                     language,
                     pref,
@@ -745,6 +790,7 @@ impl FromStr for Property {
                     altid,
                     pref,
                     type_param,
+                    value_data_type,
                     language,
                     pid,
                     group,
@@ -756,6 +802,7 @@ impl FromStr for Property {
                     pid,
                     mediatype,
                     type_param,
+                    value_data_type,
                     pref,
                     value: value.parse()?,
                 }),
@@ -763,13 +810,13 @@ impl FromStr for Property {
                     altid,
                     calscale,
                     language,
-                    type_param,
+                    value_data_type,
                     value,
                 }),
                 "anniversary" => Self::Anniversary(Anniversary {
                     altid,
                     calscale,
-                    type_param,
+                    value_data_type,
                     value,
                 }),
                 "gender" => {
@@ -803,6 +850,7 @@ impl FromStr for Property {
                         language,
                         geo,
                         tz,
+                        value_data_type,
                         type_param,
                         pref,
                         region,
@@ -816,6 +864,7 @@ impl FromStr for Property {
                     })
                 }
                 "tel" => Self::Tel(Tel {
+                    value_data_type,
                     type_param,
                     pid,
                     pref,
@@ -827,6 +876,7 @@ impl FromStr for Property {
                     group,
                     pid,
                     pref,
+                    value_data_type,
                     type_param,
                     value,
                 }),
@@ -835,6 +885,7 @@ impl FromStr for Property {
                     altid,
                     pid,
                     pref,
+                    value_data_type,
                     type_param,
                     mediatype,
                     value,
@@ -844,6 +895,7 @@ impl FromStr for Property {
                     altid,
                     pid,
                     pref,
+                    value_data_type,
                     type_param,
                     group,
                     value,
@@ -852,6 +904,7 @@ impl FromStr for Property {
                     altid,
                     pid,
                     pref,
+                    value_data_type,
                     type_param,
                     mediatype,
                     group,
@@ -861,6 +914,7 @@ impl FromStr for Property {
                     altid,
                     pid,
                     pref,
+                    value_data_type,
                     type_param,
                     mediatype,
                     group,
@@ -870,6 +924,7 @@ impl FromStr for Property {
                     altid,
                     pid,
                     pref,
+                    value_data_type,
                     type_param,
                     language,
                     group,
@@ -879,6 +934,7 @@ impl FromStr for Property {
                     altid,
                     pid,
                     pref,
+                    value_data_type,
                     type_param,
                     language,
                     group,
@@ -888,6 +944,7 @@ impl FromStr for Property {
                     altid,
                     pid,
                     pref,
+                    value_data_type,
                     type_param,
                     group,
                     value: value.split(";").map(String::from).collect(),
@@ -896,6 +953,7 @@ impl FromStr for Property {
                     altid,
                     pid,
                     pref,
+                    value_data_type,
                     type_param,
                     language,
                     sort_as,
@@ -914,6 +972,7 @@ impl FromStr for Property {
                     altid,
                     pid,
                     pref,
+                    value_data_type,
                     type_param,
                     language,
                     mediatype,
@@ -924,6 +983,7 @@ impl FromStr for Property {
                     altid,
                     pid,
                     pref,
+                    value_data_type,
                     type_param,
                     language,
                     mediatype,
@@ -934,6 +994,7 @@ impl FromStr for Property {
                     altid,
                     pid,
                     pref,
+                    value_data_type,
                     type_param,
                     language,
                     group,
@@ -945,6 +1006,7 @@ impl FromStr for Property {
                     altid,
                     pid,
                     pref,
+                    value_data_type,
                     type_param,
                     language,
                     mediatype,
@@ -952,7 +1014,7 @@ impl FromStr for Property {
                     value: value.parse()?,
                 }),
                 "uid" => Self::Uid(Uid {
-                    type_param,
+                    value_data_type,
                     group,
                     value,
                 }),
@@ -983,6 +1045,7 @@ impl FromStr for Property {
                     altid,
                     pid,
                     pref,
+                    value_data_type,
                     type_param,
                     mediatype,
                     value: value.parse()?,
@@ -992,6 +1055,7 @@ impl FromStr for Property {
                     altid,
                     pid,
                     pref,
+                    value_data_type,
                     type_param,
                     mediatype,
                     value,
@@ -1001,6 +1065,7 @@ impl FromStr for Property {
                     altid,
                     pid,
                     pref,
+                    value_data_type,
                     type_param,
                     mediatype,
                     value: value.parse()?,
@@ -1010,6 +1075,7 @@ impl FromStr for Property {
                     altid,
                     pid,
                     pref,
+                    value_data_type,
                     type_param,
                     mediatype,
                     value: value.parse()?,
@@ -1019,6 +1085,7 @@ impl FromStr for Property {
                     altid,
                     pid,
                     pref,
+                    value_data_type,
                     type_param,
                     mediatype,
                     value: value.parse()?,
@@ -1059,8 +1126,8 @@ impl FromStr for Property {
                         proprietary_parameters.push(Parameter::Label(label));
                     }
 
-                    if let Some(t) = type_param {
-                        proprietary_parameters.push(Parameter::Type(t.as_ref().into()));
+                    if !type_param.is_empty() {
+                        proprietary_parameters.push(Parameter::Type(type_param));
                     }
 
                     if let Some(pref) = pref {
@@ -1087,11 +1154,11 @@ impl FromStr for Property {
 pub enum Parameter {
     Label(String),
     Language(String),
-    Value(ValueType),
+    Value(ValueDataType),
     Pref(u8),
     AltId(String),
     Pid(Pid),
-    Type(String),
+    Type(Vec<String>),
     MediaType(String),
     CalScale(String),
     SortAs(Vec<String>),
@@ -1142,7 +1209,8 @@ impl FromStr for Parameter {
                     second_digit,
                 })
             }
-            TYPE => Self::Type(v.into()),
+            VALUE => Self::Value(ValueDataType::from_str(v)?),
+            TYPE => Self::Type(v.split(",").map(String::from).collect()),
             MEDIATYPE => Self::MediaType(v.into()),
             CALSCALE => Self::CalScale(v.into()),
             SORT_AS => Self::SortAs(v.split(",").map(String::from).collect()),

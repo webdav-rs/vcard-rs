@@ -37,7 +37,7 @@ pub enum VCardError {
     #[error("Invalid PID parameter. Expected parameter to have the form digit[.digit] (e.g: 1 or 1.2) but got {provided}")]
     InvalidPID { provided: String },
 
-    #[error("Invalid version {0}, only version 4.0 is valid")]
+    #[error("Invalid version {0}, only version 3.0 and 4.0 are valid")]
     InvalidVersion(String),
 
     #[error("Invalid gender {0}, expected one of (m,f,o,n,u)")]
