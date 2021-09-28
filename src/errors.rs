@@ -1,6 +1,5 @@
-use std::{io, string::FromUtf8Error};
+use std::{io, str::Utf8Error, string::FromUtf8Error};
 use thiserror::Error;
-use url::ParseError;
 
 #[derive(Error, Debug)]
 #[non_exhaustive]
@@ -11,7 +10,9 @@ pub enum VCardError {
     ParseIntError(#[from] std::num::ParseIntError),
 
     #[error(transparent)]
-    UTF8Error(#[from] FromUtf8Error),
+    FromUTF8Error(#[from] FromUtf8Error),
+    #[error(transparent)]
+    UTF8Error(#[from] Utf8Error),
     #[error("{reason} - complete line is:\n{raw_line}")]
     InvalidLine {
         reason: &'static str,
@@ -43,9 +44,27 @@ pub enum VCardError {
     #[error("Invalid gender {0}, expected one of (m,f,o,n,u)")]
     InvalidGenderError(String),
 
-    #[error(transparent)]
-    UrlParseError(#[from] ParseError),
+    #[error("Error parsing URL {raw_url}: {original_error}")]
+    UrlParseError {
+        raw_url: String,
+        original_error: url::ParseError,
+    },
 
     #[error("Unknown parameter {0}")]
     UnknownParameter(String),
+
+    #[error("Exceeded maximum logical line length of {0}")]
+    MaxLineLengthExceeded(u64),
+}
+
+impl VCardError {
+    pub(crate) fn url_parse_error<I: Into<String>>(
+        original_error: url::ParseError,
+        raw: I,
+    ) -> Self {
+        Self::UrlParseError {
+            original_error,
+            raw_url: raw.into(),
+        }
+    }
 }

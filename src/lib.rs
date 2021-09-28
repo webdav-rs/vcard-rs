@@ -1,36 +1,33 @@
 use lazy_static;
 use regex::{self, Regex};
-use std::{
-    cell::RefCell,
-    io::{self, BufRead, Read},
-    rc::Rc,
-    str::FromStr,
-};
+use std::{cell::RefCell, fmt::Display, io::{self, BufReader, Read}, rc::Rc, str::FromStr};
 
 use strum_macros;
 
 use errors::VCardError;
 mod errors;
 
+/// A reader that reads vcard properties one by one.
+///
+/// Vcard properties can span accross multiple lines called "logical lines".
+/// The `max_logical_line_length` field acts as a safety net to prevent memory overflows.
+/// An `std::io::BufReader` is used internally.
 pub struct VCardReader<R: io::Read> {
-    inner: io::BufReader<R>,
-    buf: [u8; 2],
-    has_leftover_bytes: bool,
+    inner: PushbackReader<R>,
     discard_buf: Rc<RefCell<Vec<u8>>>,
+    pub max_logical_line_length: u64,
 }
 
-const CRLF: [u8; 2] = [b'\r', b'\n'];
+//const CRLF: [u8; 2] = [b'\r', b'\n'];
 
-pub struct ContentLine {
-    pub group: Option<String>,
-}
-
+/// See https://datatracker.ietf.org/doc/html/rfc6350#section-6.7.9
 #[derive(Debug, PartialEq)]
 pub enum VersionValue {
     V3,
     V4,
 }
 
+/// See https://datatracker.ietf.org/doc/html/rfc6350#section-5.2
 #[derive(strum_macros::AsRefStr, Debug, PartialEq)]
 pub enum ValueDataType {
     #[strum(serialize = "uri")]
@@ -205,6 +202,14 @@ pub struct N {
     pub additional_names: Vec<String>,
     pub honorific_prefixes: Vec<String>,
     pub honorific_suffixes: Vec<String>,
+}
+
+
+impl Into<String> for N {
+    fn into(self) -> String {
+        
+        todo!()
+    }
 }
 #[derive(Debug, PartialEq)]
 pub struct Nickname {
@@ -663,6 +668,21 @@ pub enum Property {
     },
 }
 
+fn filter_and_transform(input: &str) -> Option<String> {
+    if input.is_empty() {
+        None
+    } else {
+        Some(String::from(input))
+    }
+}
+
+fn parse_url<A: AsRef<str>>(input: A) -> Result<url::Url, VCardError> {
+    input
+        .as_ref()
+        .parse()
+        .map_err(|e| VCardError::url_parse_error(e, input.as_ref()))
+}
+
 impl FromStr for Property {
     type Err = VCardError;
 
@@ -694,7 +714,7 @@ impl FromStr for Property {
                 reason: "no value found",
                 raw_line: line.into(),
             })?;
-        let name = name.to_lowercase();
+        let name = name.trim_matches(char::from(0)).to_lowercase();
         let parameters = if let Some(raw_parameter) = parameter {
             parse_parameters(raw_parameter)?
         } else {
@@ -731,7 +751,6 @@ impl FromStr for Property {
                 Parameter::Pref(p) => pref = Some(p),
                 Parameter::Label(l) => label = Some(l),
                 Parameter::Proprietary(p) => proprietary_parameters.push(Parameter::Proprietary(p)),
-                _ => return Err(VCardError::UnknownParameter(param.as_ref().into())),
             }
         }
 
@@ -755,7 +774,7 @@ impl FromStr for Property {
                     altid,
                     mediatype,
                     group,
-                    value: value.parse()?,
+                    value: parse_url(value)?,
                 }),
                 "kind" => Self::Kind(value.parse()?),
                 "fn" => Self::FN(FN {
@@ -767,9 +786,11 @@ impl FromStr for Property {
                     pref,
                 }),
                 "n" => {
-                    let mut split = value
-                        .split(";")
-                        .map(|item| item.split(";").map(String::from).collect::<Vec<String>>());
+                    let mut split = value.split(";").map(|item| {
+                        item.split(";")
+                            .filter_map(filter_and_transform)
+                            .collect::<Vec<String>>()
+                    });
                     let surenames = split.next().unwrap_or_else(Vec::new);
                     let given_names = split.next().unwrap_or_else(Vec::new);
                     let additional_names = split.next().unwrap_or_else(Vec::new);
@@ -804,7 +825,7 @@ impl FromStr for Property {
                     type_param,
                     value_data_type,
                     pref,
-                    value: value.parse()?,
+                    value: parse_url(value)?,
                 }),
                 "bday" => Self::BDay(BDay {
                     altid,
@@ -833,9 +854,11 @@ impl FromStr for Property {
                     })
                 }
                 "adr" => {
-                    let mut split = value
-                        .split(";")
-                        .map(|item| item.split(",").map(String::from).collect::<Vec<String>>());
+                    let mut split = value.split(";").map(|item| {
+                        item.split(",")
+                            .filter_map(filter_and_transform)
+                            .collect::<Vec<String>>()
+                    });
                     let po_box = split.next().unwrap_or_else(|| Vec::new());
                     let extended_address = split.next().unwrap_or_else(|| Vec::new());
                     let street = split.next().unwrap_or_else(|| Vec::new());
@@ -918,7 +941,7 @@ impl FromStr for Property {
                     type_param,
                     mediatype,
                     group,
-                    value: value.parse()?,
+                    value: parse_url(value)?,
                 }),
                 "title" => Self::Title(Title {
                     altid,
@@ -947,7 +970,7 @@ impl FromStr for Property {
                     value_data_type,
                     type_param,
                     group,
-                    value: value.split(";").map(String::from).collect(),
+                    value: value.split(";").filter_map(filter_and_transform).collect(),
                 }),
                 "org" => Self::Org(Org {
                     altid,
@@ -958,7 +981,7 @@ impl FromStr for Property {
                     language,
                     sort_as,
                     group,
-                    value: value.split(";").map(String::from).collect(),
+                    value: value.split(";").filter_map(filter_and_transform).collect(),
                 }),
                 "member" => Self::Member(Member {
                     altid,
@@ -966,7 +989,7 @@ impl FromStr for Property {
                     pref,
                     group,
                     mediatype,
-                    value: value.parse()?,
+                    value: parse_url(value)?,
                 }),
                 "related" => Self::Related(Related {
                     altid,
@@ -988,7 +1011,7 @@ impl FromStr for Property {
                     language,
                     mediatype,
                     group,
-                    value: value.parse()?,
+                    value: parse_url(value)?,
                 }),
                 "note" => Self::Note(Note {
                     altid,
@@ -1011,7 +1034,7 @@ impl FromStr for Property {
                     language,
                     mediatype,
                     group,
-                    value: value.parse()?,
+                    value: parse_url(value)?,
                 }),
                 "uid" => Self::Uid(Uid {
                     value_data_type,
@@ -1027,13 +1050,13 @@ impl FromStr for Property {
                             raw_line: value.clone(),
                         }
                     })??;
-                    let global_identifier = split.next().map(url::Url::from_str).ok_or_else(
-                        || VCardError::InvalidLine {
+                    let global_identifier = split.next().map(parse_url).ok_or_else(|| {
+                        VCardError::InvalidLine {
                             reason:
                                 "expected clientpidmap value to have two parts separated by ';'",
                             raw_line: value.clone(),
-                        },
-                    )??;
+                        }
+                    })??;
                     Self::ClientPidMap(ClientPidMap {
                         value: global_identifier,
                         pid_digit: pid,
@@ -1048,7 +1071,9 @@ impl FromStr for Property {
                     value_data_type,
                     type_param,
                     mediatype,
-                    value: value.parse()?,
+                    value: value
+                        .parse()
+                        .map_err(|e| VCardError::url_parse_error(e, value))?,
                 }),
                 "key" => Self::Key(Key {
                     group,
@@ -1068,7 +1093,7 @@ impl FromStr for Property {
                     value_data_type,
                     type_param,
                     mediatype,
-                    value: value.parse()?,
+                    value: parse_url(value)?,
                 }),
                 "caladuri" => Self::CalAdUri(CalAdURI {
                     group,
@@ -1078,7 +1103,7 @@ impl FromStr for Property {
                     value_data_type,
                     type_param,
                     mediatype,
-                    value: value.parse()?,
+                    value: parse_url(value)?,
                 }),
                 "caluri" => Self::CalUri(CalURI {
                     group,
@@ -1088,7 +1113,7 @@ impl FromStr for Property {
                     value_data_type,
                     type_param,
                     mediatype,
-                    value: value.parse()?,
+                    value: parse_url(value)?,
                 }),
                 "xml" => Self::Xml(Xml { value, group }),
                 _ => {
@@ -1100,8 +1125,10 @@ impl FromStr for Property {
                     }
 
                     // let mut language = None;
+                    if !altid.is_empty() {
+                        proprietary_parameters.push(Parameter::AltId(altid));
+                    }
 
-                    proprietary_parameters.push(Parameter::AltId(altid));
                     if let Some(pid) = pid {
                         proprietary_parameters.push(Parameter::Pid(pid));
                     }
@@ -1116,7 +1143,9 @@ impl FromStr for Property {
                         proprietary_parameters.push(Parameter::Geo(geo));
                     }
 
-                    proprietary_parameters.push(Parameter::SortAs(sort_as));
+                    if !sort_as.is_empty() {
+                        proprietary_parameters.push(Parameter::SortAs(sort_as));
+                    }
 
                     if let Some(calscale) = calscale {
                         proprietary_parameters.push(Parameter::CalScale(calscale));
@@ -1190,7 +1219,6 @@ impl FromStr for Parameter {
         let identifier = k.to_lowercase();
         let param = match &identifier[..] {
             LANGUAGE => Parameter::Language(v.into()),
-            VALUE => Parameter::Value(v.parse()?),
             PREF => Parameter::Pref(v.parse()?),
             ALTID => Parameter::AltId(v.into()),
             PID => {
@@ -1223,26 +1251,100 @@ impl FromStr for Parameter {
 }
 
 fn parse_parameters(raw: &str) -> Result<Vec<Parameter>, VCardError> {
-    raw.trim_start_matches(";")
-        .split(";")
-        .map(Parameter::from_str)
-        .collect::<Result<Vec<Parameter>, VCardError>>()
+    let raw = raw.trim_start_matches(";");
+    let mut result = Vec::new();
+    let mut prev = 0;
+    let mut buf = Vec::new();
+    for char in raw.as_bytes() {
+        // it is possible that a parameter contains an escaped semicolon (in the form \;).
+        // We have to ensure those semicolons are not parsed as a separate parameter.
+        if *char == b';' && prev != b'\\' {
+            let s = std::str::from_utf8(&buf)?;
+            let param = s.parse()?;
+            result.push(param);
+            buf.clear();
+        } else {
+            prev = *char;
+            buf.push(*char);
+        }
+    }
+    // ensure that the last entry gets added as well.
+    let s = std::str::from_utf8(&buf)?;
+    let param = s.parse()?;
+    result.push(param);
+    Ok(result)
 }
 
 lazy_static::lazy_static! {
-    static ref RE: Regex = Regex::new(r"(?P<group>.+\.)?(?P<name>[^;]+)(?P<parameter>;.+)*:(?P<value>.+)").unwrap();
+    static ref RE: Regex = Regex::new(r"(?P<group>[^;:]+\.)?(?P<name>[^;:]+)(?P<parameter>;[^:]+)*:(?P<value>.+)").unwrap();
+}
+
+const DEFAULT_MAX_LINE_LENGTH: u64 = 5000;
+
+enum LineInspection {
+    NoMoreContent,
+    Discard,
+    LogicalLine,
+    NewProperty,
 }
 
 impl<R: io::Read> VCardReader<R> {
+    /// Creates a new `VCardReader` with the default logical line limit of 5000
     pub fn new(input: R) -> Self {
+        Self::new_with_logical_line_limit(input, DEFAULT_MAX_LINE_LENGTH)
+    }
+
+    /// Creates a new `VCardReader` with a configurable line limit
+    pub fn new_with_logical_line_limit(input: R, max_logical_line_length: u64) -> Self {
         Self {
-            inner: io::BufReader::new(input),
-            has_leftover_bytes: false,
-            buf: [0; 2],
-            discard_buf: Rc::new(RefCell::new(Vec::new())),
+            inner: PushbackReader {
+                inner: io::BufReader::new(input),
+                buf_index: 0,
+                buf: [0, 0],
+            },
+            discard_buf: Rc::new(RefCell::new(Vec::with_capacity(1024))),
+            max_logical_line_length,
         }
     }
 
+    fn inspect_next_line(&mut self) -> Result<LineInspection, VCardError> {
+        let mut buf = [0, 0];
+        // read the next two bytes. If the next byte continues with a whicespace char (space (U+0020) or horizontal tab (U+0009))
+        // it counts as a logical continuation of this line.
+        // If not, we indicate that those two bytes belong to the next line and return the line as is.
+        if let Err(e) = self.inner.read_exact(&mut buf) {
+            match e.kind() {
+                // this means, there are no more bytes left. Most likely, this means we reached the END:VCARD line.
+                io::ErrorKind::UnexpectedEof => {
+                    return Ok(LineInspection::NoMoreContent);
+                }
+                _ => return Err(VCardError::Io(e)),
+            }
+        }
+
+        if buf[0] != b' ' && buf[0] != b'\t' {
+            self.inner.return_bytes(buf);
+            return Ok(LineInspection::NewProperty);
+        }
+
+        // The spec tells us that we have to ensure that the start of a continued line does not have two whitespace characters in a  row
+        match buf[1] {
+            b' ' | b'\t' | b'\n' | b'\r' => {
+                self.inner.return_bytes(buf);
+                return Ok(LineInspection::Discard);
+            }
+            _ => {
+                return {
+                    self.inner.return_byte(buf[1]);
+                    Ok(LineInspection::LogicalLine)
+                }
+            }
+        }
+    }
+
+    /// Reads the next Property from this vcard. In case the logical property line exceeds `max_logical_line_length`
+    /// an `VCardError::MaxLineLengthExceeded` will be returned.
+    /// see https://datatracker.ietf.org/doc/html/rfc6350#section-3.2 for more information about logical lines.
     pub fn read_property(&mut self) -> Result<Property, VCardError> {
         let line = self.read_logical_line()?;
         Property::from_str(&line[..])
@@ -1250,67 +1352,298 @@ impl<R: io::Read> VCardReader<R> {
     fn read_logical_line(&mut self) -> Result<String, VCardError> {
         let mut logical_line_buf = Vec::new();
 
-        // append leftover bytes that we have falsely consumed for checking a logical line continuation.
-        if !self.has_leftover_bytes {
-            for i in self.buf {
-                logical_line_buf.push(i);
-            }
-            self.has_leftover_bytes = false;
-        }
+        // a logical line always starts with a new property declaration
+        self.read_physical_line(&mut logical_line_buf)?;
 
         loop {
-            self.read_until_crlf(&mut logical_line_buf)?;
-
-            // read the next two bytes. If the next byte continues with a whicespace char (space (U+0020) or horizontal tab (U+0009))
-            // it counts as a logical continuation of this line.
-            // If not, we indicate that those two bytes belong to the next line and return the line as is.
-            if let Err(e) = self.inner.read_exact(&mut self.buf) {
-                match e.kind() {
-                    // this means, there are no more bytes left. Most likely, this means we reached the END:VCARD line.
-                    io::ErrorKind::UnexpectedEof => {
-                        return Ok(String::from_utf8(logical_line_buf)?);
-                    }
-                    _ => return Err(VCardError::Io(e)),
+            match self.inspect_next_line()? {
+                LineInspection::NewProperty => {
+                    // a logical line expands only accross one property.
+                    // if we encounter the declaration of the next property, the logical line has an end.
+                    return Ok(String::from_utf8(logical_line_buf)?);
                 }
-            }
-
-            if self.buf[0] != b' ' && self.buf[0] != b'\t' {
-                self.has_leftover_bytes = true;
-                return Ok(String::from_utf8(logical_line_buf)?);
-            }
-
-            // The spec tells us that we have to ensure that the start of a continued line does not have two whitespace characters in a  row
-            match self.buf[1] {
-                b' ' | b'\t' | b'\n' | b'\r' => {
-                    self.discard_line()?;
-                }
-                _ => {
-                    logical_line_buf.push(self.buf[1]);
+                LineInspection::NoMoreContent => return Ok(String::from_utf8(logical_line_buf)?),
+                LineInspection::Discard => self.discard_line()?,
+                LineInspection::LogicalLine => {
+                    self.read_physical_line(&mut logical_line_buf)?;
                 }
             }
         }
     }
     fn discard_line(&mut self) -> Result<(), VCardError> {
         let rc = Rc::clone(&self.discard_buf.clone());
-        self.read_until_crlf(&mut rc.as_ref().borrow_mut())?;
+        let mut buf = rc.as_ref().borrow_mut();
+        self.read_physical_line(&mut buf)?;
         Ok(())
     }
 
-    fn read_until_crlf(&mut self, mut buf: &mut Vec<u8>) -> Result<(), VCardError> {
+    fn read_physical_line(&mut self, buf: &mut Vec<u8>) -> Result<(), VCardError> {
+        let mut tmp_buf = [0];
+
         loop {
-            self.inner.read_until(b'\n', &mut buf)?;
-            if buf.ends_with(&CRLF) {
-                // remove CRLF
-                buf.pop();
-                buf.pop();
-                return Ok(());
+            if buf.len() as u64 > self.max_logical_line_length {
+                return Err(VCardError::MaxLineLengthExceeded(
+                    self.max_logical_line_length,
+                ));
+            }
+            // this should be okay since lines are usually short and we use a bufreader
+            self.inner.read_exact(&mut tmp_buf)?;
+            if tmp_buf[0] == b'\r' {
+                // read one more byte to see if it is a \n char
+                self.inner.read_exact(&mut tmp_buf)?;
+                if tmp_buf[0] == b'\n' {
+                    return Ok(());
+                } else {
+                    buf.extend(tmp_buf);
+                }
+            } else {
+                buf.extend(tmp_buf);
             }
         }
     }
 }
 
+// This reader makes it possible to return a certain amount of bytes back to the reader itself.
+// The use case is the inspection of bytes in order to determine the continuation/end of logical lines in a vcard.
+struct PushbackReader<R> {
+    inner: BufReader<R>,
+    buf: [u8; 2],
+    buf_index: usize,
+}
+
+impl<R: io::Read> PushbackReader<R> {
+    fn return_byte(&mut self, b: u8) {
+        if self.buf_index > 1 {
+            self.buf_index = 0;
+        }
+        self.buf[self.buf_index] = b;
+        self.buf_index = self.buf_index + 1;
+    }
+
+    fn return_bytes(&mut self, b: [u8; 2]) {
+        self.buf = b;
+        self.buf_index = 2;
+    }
+}
+impl<R: io::Read> Read for PushbackReader<R> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        if self.buf_index == 0 {
+            return self.inner.read(buf);
+        }
+        let first = &self.buf.as_ref()[0..self.buf_index];
+        let mut chain = first.chain(&mut self.inner);
+        let result = chain.read(buf)?;
+
+        match result {
+            1 => {
+                self.buf[0] = self.buf[1];
+                let new_index = self.buf_index - 1;
+                self.buf_index = std::cmp::max(new_index, 0);
+            }
+            2 => {
+                self.buf_index = 0;
+            }
+            _ => {}
+        }
+        return Ok(result);
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::vec;
+
+    use super::*;
+
     #[test]
-    fn it_works() {}
+    fn test_multi_line() -> Result<(), Box<dyn std::error::Error>> {
+        let testant = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/test_assets/new_line.vcf",
+        ))
+        .to_vec();
+
+        let mut reader = VCardReader::new(&testant[..]);
+
+        let expected = vec![
+            Property::Begin {
+                value: "VCARD".into(),
+            },
+            Property::Version(Version {
+                value: VersionValue::V3,
+            }),
+            Property::FN(FN {
+                altid: String::new(),
+                value_data_type: None,
+                type_param: Vec::new(),
+                language: None,
+                pref: None,
+                value: "Heinrich vom Tosafjordasdfsadfasdf".into(),
+            }),
+            Property::End {
+                value: "VCARD".into(),
+            },
+        ];
+
+        for expected_property in expected.iter() {
+            let actual_property = reader.read_property()?;
+            assert_eq!(expected_property, &actual_property);
+        }
+        let mut reader = VCardReader::new_with_logical_line_limit(&testant[..], 36);
+        for _i in [0; 2] {
+            reader.read_property()?;
+        }
+
+        let result = reader.read_property();
+
+        if let Ok(_p) = result {
+            panic!("expected MaxLineLengthExceeded error");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_apple_icloud_format() -> Result<(), Box<dyn std::error::Error>> {
+        let testant = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/test_assets/apple_icloud.vcf",
+        ))
+        .to_vec();
+        let mut reader = VCardReader::new(&testant[..]);
+
+        let expected = vec![
+            Property::Begin {
+                value: "VCARD".into(),
+            },
+            Property::Version(Version {
+                value: VersionValue::V3,
+            }),
+            Property::N(N {
+                altid: String::new(),
+                sort_as: Vec::new(),
+                group: None,
+                surenames: vec!["vom Tosafjord".into()],
+                given_names: vec!["Heinrich".into()],
+                additional_names: Vec::new(),
+                honorific_prefixes: Vec::new(),
+                honorific_suffixes: Vec::new(),
+            }),
+            Property::FN(FN {
+                altid: String::new(),
+                value_data_type: None,
+                type_param: Vec::new(),
+                language: None,
+                pref: None,
+                value: "Heinrich vom Tosafjord".into(),
+            }),
+            Property::Org(Org {
+                sort_as: Vec::new(),
+                pid: None,
+                group: None,
+                altid: String::new(),
+                value_data_type: None,
+                type_param: Vec::new(),
+                language: None,
+                pref: None,
+                value: vec!["Richter GBR".into()],
+            }),
+            Property::BDay(BDay {
+                altid: String::new(),
+                calscale: None,
+                value_data_type: Some(ValueDataType::Date),
+                language: None,
+                value: "2017-01-03".into(),
+            }),
+            Property::Note(Note {
+                pid: None,
+                group: None,
+                altid: String::new(),
+                value_data_type: None,
+                type_param: Vec::new(),
+                language: None,
+                pref: None,
+                value: "ist eine Katze".into(),
+            }),
+            Property::Adr(Address {
+                group: Some("item1".into()),
+                city: vec!["Katzenhausen".into()],
+                street: vec!["am Katzenklo".into()],
+                type_param: vec!["HOME".into(), "pref".into()],
+                altid: String::new(),
+                label: None,
+                language: None,
+                geo: None,
+                tz: None,
+                pid: None,
+                pref: None,
+                value_data_type: None,
+                po_box: Vec::new(),
+                extended_address: Vec::new(),
+                postal_code: vec!["23456".into()],
+                country: vec!["Germany".into()],
+                region: Vec::new(),
+            }),
+            Property::Proprietary {
+                name: "x-abadr".into(),
+                group: Some("item1".into()),
+                value: "de".into(),
+                parameters: Vec::new(),
+            },
+            Property::Tel(Tel {
+                type_param: vec!["CELL".into(), "pref".into(), "VOICE".into()],
+                value_data_type: None,
+                pid: None,
+                pref: None,
+                altid: String::new(),
+                value: "017610101520".into(),
+            }),
+            Property::Url(VcardURL {
+                group: Some("item2".into()),
+                type_param: vec!["pref".into()],
+                value: "https://www.example.com/heinrich".parse()?,
+                altid: String::new(),
+                pid: None,
+                pref: None,
+                value_data_type: None,
+                mediatype: None,
+            }),
+            Property::Proprietary {
+                name: "x-ablabel".into(),
+                group: Some("item2".into()),
+                value: "_$!<HomePage>!$_".into(),
+                parameters: Vec::new(),
+            },
+            Property::Email(Email {
+                group: None,
+                type_param: vec!["HOME".into(), "pref".into(), "INTERNET".into()],
+                pid: None,
+                altid: String::new(),
+                pref: None,
+                value_data_type: None,
+                value: "heinrich@tosafjord.com".into(),
+            }),
+            Property::ProdId(ProdId {
+                group: None,
+                value: "-//Apple Inc.//iCloud Web Address Book 2117B3//EN".into(),
+            }),
+            Property::Rev(Rev {
+                group: None,
+                value: "2021-09-23T05:51:29Z".into(),
+            }),
+            Property::End {
+                value: "VCARD".into(),
+            },
+        ];
+
+        for expected_prop in expected {
+            let prop = match reader.read_property() {
+                Ok(p) => p,
+                Err(e) => {
+                    panic!("expected prop {:#?} but got error {}", expected_prop, e);
+                }
+            };
+            assert_eq!(expected_prop, prop);
+        }
+        Ok(())
+    }
 }
