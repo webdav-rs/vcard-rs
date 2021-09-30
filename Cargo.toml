@@ -1,16 +1,6 @@
-[package]
-name = "vcard-rs"
-version = "0.1.0"
-edition = "2018"
+[workspace]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-
-thiserror= "1"
-regex = "1"
-lazy_static="1"
-url = "2"
-chrono = "0.4"
-strum = { version = "0.21"}
-strum_macros = "0.21"
+members = [
+    "vcard",
+    "vcard_macro",
+]

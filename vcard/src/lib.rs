@@ -1,11 +1,18 @@
 use lazy_static;
 use regex::{self, Regex};
-use std::{cell::RefCell, fmt::Display, io::{self, BufReader, Read}, rc::Rc, str::FromStr};
+use std::{
+    cell::RefCell,
+    fmt::Display,
+    io::{self, BufReader, Read},
+    rc::Rc,
+    str::FromStr,
+};
 
 use strum_macros;
 
 use errors::VCardError;
 mod errors;
+use vcard_macro::vcard;
 
 /// A reader that reads vcard properties one by one.
 ///
@@ -18,12 +25,12 @@ pub struct VCardReader<R: io::Read> {
     pub max_logical_line_length: u64,
 }
 
-//const CRLF: [u8; 2] = [b'\r', b'\n'];
-
 /// See https://datatracker.ietf.org/doc/html/rfc6350#section-6.7.9
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, strum_macros::AsRefStr)]
 pub enum VersionValue {
+    #[strum(serialize = "3.0")]
     V3,
+    #[strum(serialize = "4.0")]
     V4,
 }
 
@@ -105,8 +112,26 @@ pub struct Pid {
     pub second_digit: Option<u8>,
 }
 
+impl Display for Pid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(d) = self.second_digit {
+            write!(f, "{}.{}", self.first_digit, d)
+        } else {
+            write!(f, "{}", self.first_digit)
+        }
+    }
+}
+
+
+#[vcard]
+#[derive(Debug, PartialEq)]
+pub struct Kind{
+    pub group: Option<String>,
+    pub value: KindValue
+}
+
 #[derive(strum_macros::AsRefStr, Debug, PartialEq)]
-pub enum Kind {
+pub enum KindValue {
     #[strum(serialize = "individual")]
     Individual, //  default
     #[strum(serialize = "group")]
@@ -118,7 +143,7 @@ pub enum Kind {
     Proprietary(String),
 }
 
-impl FromStr for Kind {
+impl FromStr for KindValue {
     type Err = VCardError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -147,6 +172,7 @@ pub enum Sex {
     Unknown,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct Gender {
     pub sex: Option<Sex>,
@@ -169,34 +195,42 @@ impl FromStr for Sex {
     }
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct Version {
     pub value: VersionValue,
 }
+
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct Source {
     pub group: Option<String>,
     pub pid: Option<Pid>,
-    pub altid: String,
+    pub altid: Option<String>,
     pub mediatype: Option<String>,
     pub value: url::Url,
 }
 
-#[derive(Debug, PartialEq)]
+#[vcard]
+#[derive(Debug, PartialEq, Default)]
 pub struct FN {
-    pub altid: String,
+    pub group: Option<String>,
+    pub altid: Option<String>,
     pub value_data_type: Option<ValueDataType>,
-    pub type_param: Vec<String>,
+    pub type_param: Option<Vec<String>>,
     pub language: Option<String>,
     pub pref: Option<u8>,
     pub value: String,
 }
 
-#[derive(Debug, PartialEq)]
+#[vcard]
+#[derive(Debug, PartialEq, Default)]
 pub struct N {
-    pub altid: String,
-    pub sort_as: Vec<String>,
+    pub altid: Option<String>,
+    pub language: Option<String>,
+    pub sort_as: Option<Vec<String>>,
     pub group: Option<String>,
+
     pub surenames: Vec<String>,
     pub given_names: Vec<String>,
     pub additional_names: Vec<String>,
@@ -204,19 +238,13 @@ pub struct N {
     pub honorific_suffixes: Vec<String>,
 }
 
-
-impl Into<String> for N {
-    fn into(self) -> String {
-        
-        todo!()
-    }
-}
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct Nickname {
     pub group: Option<String>,
-    pub altid: String,
+    pub altid: Option<String>,
     pub value_data_type: Option<ValueDataType>,
-    pub type_param: Vec<String>,
+    pub type_param: Option<Vec<String>>,
 
     pub language: Option<String>,
     pub pref: Option<u8>,
@@ -224,38 +252,43 @@ pub struct Nickname {
     pub value: Vec<String>,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct Photo {
     pub group: Option<String>,
-    pub altid: String,
+    pub altid: Option<String>,
     pub value_data_type: Option<ValueDataType>,
-    pub type_param: Vec<String>,
+    pub type_param: Option<Vec<String>>,
     pub mediatype: Option<String>,
     pub pref: Option<u8>,
     pub pid: Option<Pid>,
     pub value: url::Url,
 }
+
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct BDay {
-    pub altid: String,
+    pub altid: Option<String>,
     pub calscale: Option<String>,
     pub value_data_type: Option<ValueDataType>,
     pub language: Option<String>,
     pub value: String,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct Anniversary {
-    pub altid: String,
+    pub altid: Option<String>,
     pub calscale: Option<String>,
     pub value_data_type: Option<ValueDataType>,
     pub value: String,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
-pub struct Address {
+pub struct Adr {
     pub group: Option<String>,
-    pub altid: String,
+    pub altid: Option<String>,
     pub label: Option<String>,
     pub language: Option<String>,
     pub geo: Option<String>,
@@ -263,7 +296,7 @@ pub struct Address {
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
     pub value_data_type: Option<ValueDataType>,
-    pub type_param: Vec<String>,
+    pub type_param: Option<Vec<String>>,
 
     pub po_box: Vec<String>,
     pub extended_address: Vec<String>,
@@ -274,122 +307,132 @@ pub struct Address {
     pub country: Vec<String>,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct Tel {
     pub value_data_type: Option<ValueDataType>,
-    pub type_param: Vec<String>,
+    pub type_param: Option<Vec<String>>,
 
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
-    pub altid: String,
+    pub altid: Option<String>,
     pub value: String,
 }
 
-#[derive(Debug, PartialEq)]
+#[vcard]
+#[derive(Debug, PartialEq, Default)]
 pub struct Email {
     pub group: Option<String>,
-    pub altid: String,
+    pub altid: Option<String>,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
     pub value_data_type: Option<ValueDataType>,
-    pub type_param: Vec<String>,
+    pub type_param: Option<Vec<String>>,
 
     pub value: String,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct Impp {
     pub group: Option<String>,
-    pub altid: String,
+    pub altid: Option<String>,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
     pub mediatype: Option<String>,
     pub value_data_type: Option<ValueDataType>,
-    pub type_param: Vec<String>,
+    pub type_param: Option<Vec<String>>,
 
     pub value: String,
 }
+
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct Language {
     pub group: Option<String>,
-    pub altid: String,
+    pub altid: Option<String>,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
     pub value_data_type: Option<ValueDataType>,
-    pub type_param: Vec<String>,
+    pub type_param: Option<Vec<String>>,
 
     pub value: String,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct Tz {
     pub group: Option<String>,
 
-    pub altid: String,
+    pub altid: Option<String>,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
     pub value_data_type: Option<ValueDataType>,
-    pub type_param: Vec<String>,
+    pub type_param: Option<Vec<String>>,
 
     pub mediatype: Option<String>,
 
     pub value: String,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct Geo {
     pub group: Option<String>,
 
-    pub altid: String,
+    pub altid: Option<String>,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
     pub value_data_type: Option<ValueDataType>,
-    pub type_param: Vec<String>,
+    pub type_param: Option<Vec<String>>,
 
     pub mediatype: Option<String>,
 
     pub value: url::Url,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct Title {
     pub group: Option<String>,
 
-    pub altid: String,
+    pub altid: Option<String>,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
     pub value_data_type: Option<ValueDataType>,
-    pub type_param: Vec<String>,
+    pub type_param: Option<Vec<String>>,
 
     pub language: Option<String>,
 
     pub value: String,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct Role {
     pub group: Option<String>,
 
-    pub altid: String,
+    pub altid: Option<String>,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
     pub value_data_type: Option<ValueDataType>,
-    pub type_param: Vec<String>,
+    pub type_param: Option<Vec<String>>,
 
     pub language: Option<String>,
 
     pub value: String,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct Logo {
     pub group: Option<String>,
 
-    pub altid: String,
+    pub altid: Option<String>,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
     pub value_data_type: Option<ValueDataType>,
-    pub type_param: Vec<String>,
+    pub type_param: Option<Vec<String>>,
 
     pub language: Option<String>,
     pub mediatype: Option<String>,
@@ -397,27 +440,29 @@ pub struct Logo {
     pub value: url::Url,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct Org {
     pub group: Option<String>,
 
-    pub altid: String,
+    pub altid: Option<String>,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
     pub value_data_type: Option<ValueDataType>,
-    pub type_param: Vec<String>,
+    pub type_param: Option<Vec<String>>,
 
     pub language: Option<String>,
-    pub sort_as: Vec<String>,
+    pub sort_as: Option<Vec<String>>,
 
     pub value: Vec<String>,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct Member {
     pub group: Option<String>,
 
-    pub altid: String,
+    pub altid: Option<String>,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
     pub mediatype: Option<String>,
@@ -425,15 +470,16 @@ pub struct Member {
     pub value: url::Url,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct Related {
     pub group: Option<String>,
 
-    pub altid: String,
+    pub altid: Option<String>,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
     pub value_data_type: Option<ValueDataType>,
-    pub type_param: Vec<String>,
+    pub type_param: Option<Vec<String>>,
 
     pub language: Option<String>,
     pub mediatype: Option<String>,
@@ -441,55 +487,60 @@ pub struct Related {
     pub value: String,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct Categories {
     pub group: Option<String>,
 
-    pub altid: String,
+    pub altid: Option<String>,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
     pub value_data_type: Option<ValueDataType>,
-    pub type_param: Vec<String>,
+    pub type_param: Option<Vec<String>>,
 
     pub value: Vec<String>,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct Note {
     pub group: Option<String>,
 
-    pub altid: String,
+    pub altid: Option<String>,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
     pub value_data_type: Option<ValueDataType>,
-    pub type_param: Vec<String>,
+    pub type_param: Option<Vec<String>>,
 
     pub language: Option<String>,
 
     pub value: String,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct ProdId {
     pub group: Option<String>,
     pub value: String,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct Rev {
     pub group: Option<String>,
     pub value: String,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct Sound {
     pub group: Option<String>,
 
-    pub altid: String,
+    pub altid: Option<String>,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
     pub value_data_type: Option<ValueDataType>,
-    pub type_param: Vec<String>,
+    pub type_param: Option<Vec<String>>,
 
     pub language: Option<String>,
     pub mediatype: Option<String>,
@@ -497,6 +548,7 @@ pub struct Sound {
     pub value: url::Url,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct Uid {
     pub group: Option<String>,
@@ -504,78 +556,86 @@ pub struct Uid {
     pub value: String,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct ClientPidMap {
     pub group: Option<String>,
     pub pid_digit: u8,
     pub value: url::Url,
 }
+
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct VcardURL {
     pub group: Option<String>,
-    pub altid: String,
+    pub altid: Option<String>,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
     pub value_data_type: Option<ValueDataType>,
-    pub type_param: Vec<String>,
+    pub type_param: Option<Vec<String>>,
 
     pub mediatype: Option<String>,
     pub value: url::Url,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct FbURL {
     pub group: Option<String>,
-    pub altid: String,
+    pub altid: Option<String>,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
     pub value_data_type: Option<ValueDataType>,
-    pub type_param: Vec<String>,
+    pub type_param: Option<Vec<String>>,
 
     pub mediatype: Option<String>,
     pub value: url::Url,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct CalAdURI {
     pub group: Option<String>,
-    pub altid: String,
+    pub altid: Option<String>,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
     pub value_data_type: Option<ValueDataType>,
-    pub type_param: Vec<String>,
+    pub type_param: Option<Vec<String>>,
 
     pub mediatype: Option<String>,
     pub value: url::Url,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct CalURI {
     pub group: Option<String>,
-    pub altid: String,
+    pub altid: Option<String>,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
     pub value_data_type: Option<ValueDataType>,
-    pub type_param: Vec<String>,
+    pub type_param: Option<Vec<String>>,
     pub mediatype: Option<String>,
     pub value: url::Url,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct Key {
     pub group: Option<String>,
 
-    pub altid: String,
+    pub altid: Option<String>,
     pub pid: Option<Pid>,
     pub pref: Option<u8>,
     pub value_data_type: Option<ValueDataType>,
-    pub type_param: Vec<String>,
+    pub type_param: Option<Vec<String>>,
 
     pub mediatype: Option<String>,
 
     pub value: String,
 }
 
+#[vcard]
 #[derive(Debug, PartialEq)]
 pub struct Xml {
     pub group: Option<String>,
@@ -593,7 +653,7 @@ pub enum Property {
     #[strum(serialize = "source")]
     Source(Source),
     #[strum(serialize = "kind")]
-    Kind(Kind),
+    Kind(KindValue),
     #[strum(serialize = "fn")]
     FN(FN),
     #[strum(serialize = "n")]
@@ -609,7 +669,7 @@ pub enum Property {
     #[strum(serialize = "gender")]
     Gender(Gender),
     #[strum(serialize = "adr")]
-    Adr(Address),
+    Adr(Adr),
     #[strum(serialize = "tel")]
     Tel(Tel),
     #[strum(serialize = "email")]
@@ -728,7 +788,7 @@ impl FromStr for Property {
         let mut geo = None;
         let mut sort_as = None;
         let mut calscale = None;
-        let mut type_param: Vec<String> = Vec::new();
+        let mut type_param: Option<Vec<String>> = None;
         let mut value_data_type = None;
         let mut pref = None;
         let mut language = None;
@@ -745,7 +805,11 @@ impl FromStr for Property {
                 Parameter::CalScale(c) => calscale = Some(c),
                 Parameter::Value(t) => value_data_type = Some(t),
                 Parameter::Type(mut t) => {
-                    type_param.append(&mut t);
+                    if let Some(tp) = type_param.as_mut() {
+                        tp.append(&mut t);
+                    } else {
+                        type_param = Some(t);
+                    }
                 }
                 Parameter::Language(l) => language = Some(l),
                 Parameter::Pref(p) => pref = Some(p),
@@ -753,9 +817,6 @@ impl FromStr for Property {
                 Parameter::Proprietary(p) => proprietary_parameters.push(Parameter::Proprietary(p)),
             }
         }
-
-        let sort_as = sort_as.unwrap_or_default();
-        let altid = altid.unwrap_or_default();
 
         let prop =
             match &name[..] {
@@ -778,6 +839,7 @@ impl FromStr for Property {
                 }),
                 "kind" => Self::Kind(value.parse()?),
                 "fn" => Self::FN(FN {
+                    group,
                     altid,
                     type_param,
                     value_data_type,
@@ -797,6 +859,7 @@ impl FromStr for Property {
                     let honorific_prefixes = split.next().unwrap_or_else(Vec::new);
                     let honorific_suffixes = split.next().unwrap_or_else(Vec::new);
                     Self::N(N {
+                        language,
                         sort_as,
                         altid,
                         additional_names,
@@ -866,7 +929,7 @@ impl FromStr for Property {
                     let region = split.next().unwrap_or_else(|| Vec::new());
                     let postal_code = split.next().unwrap_or_else(|| Vec::new());
                     let country = split.next().unwrap_or_else(|| Vec::new());
-                    Self::Adr(Address {
+                    Self::Adr(Adr {
                         altid,
                         pid,
                         label,
@@ -1125,7 +1188,7 @@ impl FromStr for Property {
                     }
 
                     // let mut language = None;
-                    if !altid.is_empty() {
+                    if let Some(altid) = altid {
                         proprietary_parameters.push(Parameter::AltId(altid));
                     }
 
@@ -1143,7 +1206,7 @@ impl FromStr for Property {
                         proprietary_parameters.push(Parameter::Geo(geo));
                     }
 
-                    if !sort_as.is_empty() {
+                    if let Some(sort_as) = sort_as {
                         proprietary_parameters.push(Parameter::SortAs(sort_as));
                     }
 
@@ -1155,7 +1218,7 @@ impl FromStr for Property {
                         proprietary_parameters.push(Parameter::Label(label));
                     }
 
-                    if !type_param.is_empty() {
+                    if let Some(type_param) = type_param {
                         proprietary_parameters.push(Parameter::Type(type_param));
                     }
 
@@ -1456,6 +1519,37 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_display() -> Result<(), Box<dyn std::error::Error>> {
+        let mut n = N::default();
+        assert_eq!("N:;;;;\r\n", n.to_string());
+        n.sort_as = Some(vec!["foo".into(), "bar".into()]);
+        assert_eq!("N;SORT-AS=\"foo,bar\":;;;;\r\n", n.to_string());
+        n.surenames = vec!["Vom Tosafjord".into()];
+        n.given_names = vec!["Heinrich".into()];
+        assert_eq!(
+            "N;SORT-AS=\"foo,bar\":Vom Tosafjord;Heinrich;;;\r\n",
+            n.to_string()
+        );
+
+        let mut e = Email::default();
+        assert_eq!("EMAIL:\r\n", e.to_string());
+
+        e.group = Some("foo".into());
+
+        assert_eq!("foo.EMAIL:\r\n", e.to_string());
+
+        e.altid = Some("asdf".into());
+
+        assert_eq!("foo.EMAIL;ALTID=asdf:\r\n", e.to_string());
+
+        e.value = "mail@example.com".into();
+
+        assert_eq!("foo.EMAIL;ALTID=asdf:mail@example.com\r\n", e.to_string());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_multi_line() -> Result<(), Box<dyn std::error::Error>> {
         let testant = include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -1473,9 +1567,10 @@ mod tests {
                 value: VersionValue::V3,
             }),
             Property::FN(FN {
-                altid: String::new(),
+                group: None,
+                altid: None,
                 value_data_type: None,
-                type_param: Vec::new(),
+                type_param: None,
                 language: None,
                 pref: None,
                 value: "Heinrich vom Tosafjordasdfsadfasdf".into(),
@@ -1519,8 +1614,9 @@ mod tests {
                 value: VersionValue::V3,
             }),
             Property::N(N {
-                altid: String::new(),
-                sort_as: Vec::new(),
+                altid: None,
+                sort_as: None,
+                language: None,
                 group: None,
                 surenames: vec!["vom Tosafjord".into()],
                 given_names: vec!["Heinrich".into()],
@@ -1529,26 +1625,27 @@ mod tests {
                 honorific_suffixes: Vec::new(),
             }),
             Property::FN(FN {
-                altid: String::new(),
+                group: None,
+                altid: None,
                 value_data_type: None,
-                type_param: Vec::new(),
+                type_param: None,
                 language: None,
                 pref: None,
                 value: "Heinrich vom Tosafjord".into(),
             }),
             Property::Org(Org {
-                sort_as: Vec::new(),
+                sort_as: None,
                 pid: None,
                 group: None,
-                altid: String::new(),
+                altid: None,
                 value_data_type: None,
-                type_param: Vec::new(),
+                type_param: None,
                 language: None,
                 pref: None,
                 value: vec!["Richter GBR".into()],
             }),
             Property::BDay(BDay {
-                altid: String::new(),
+                altid: None,
                 calscale: None,
                 value_data_type: Some(ValueDataType::Date),
                 language: None,
@@ -1557,19 +1654,19 @@ mod tests {
             Property::Note(Note {
                 pid: None,
                 group: None,
-                altid: String::new(),
+                altid: None,
                 value_data_type: None,
-                type_param: Vec::new(),
+                type_param: None,
                 language: None,
                 pref: None,
                 value: "ist eine Katze".into(),
             }),
-            Property::Adr(Address {
+            Property::Adr(Adr {
                 group: Some("item1".into()),
                 city: vec!["Katzenhausen".into()],
                 street: vec!["am Katzenklo".into()],
-                type_param: vec!["HOME".into(), "pref".into()],
-                altid: String::new(),
+                type_param: Some(vec!["HOME".into(), "pref".into()]),
+                altid: None,
                 label: None,
                 language: None,
                 geo: None,
@@ -1590,18 +1687,18 @@ mod tests {
                 parameters: Vec::new(),
             },
             Property::Tel(Tel {
-                type_param: vec!["CELL".into(), "pref".into(), "VOICE".into()],
+                type_param: Some(vec!["CELL".into(), "pref".into(), "VOICE".into()]),
                 value_data_type: None,
                 pid: None,
                 pref: None,
-                altid: String::new(),
+                altid: None,
                 value: "017610101520".into(),
             }),
             Property::Url(VcardURL {
                 group: Some("item2".into()),
-                type_param: vec!["pref".into()],
+                type_param: Some(vec!["pref".into()]),
                 value: "https://www.example.com/heinrich".parse()?,
-                altid: String::new(),
+                altid: None,
                 pid: None,
                 pref: None,
                 value_data_type: None,
@@ -1615,9 +1712,9 @@ mod tests {
             },
             Property::Email(Email {
                 group: None,
-                type_param: vec!["HOME".into(), "pref".into(), "INTERNET".into()],
+                type_param: Some(vec!["HOME".into(), "pref".into(), "INTERNET".into()]),
                 pid: None,
-                altid: String::new(),
+                altid: None,
                 pref: None,
                 value_data_type: None,
                 value: "heinrich@tosafjord.com".into(),
