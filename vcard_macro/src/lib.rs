@@ -1,6 +1,90 @@
 use proc_macro::TokenStream;
 use quote::{quote, quote_spanned};
-use syn::{self, spanned::Spanned, Fields, Item};
+use syn::{self, spanned::Spanned, Fields, Ident, Item};
+
+fn impl_getter_trait_for_type<T>(
+    input: TokenStream,
+    field_name: &str,
+    error_message: &str,
+    callback: impl Fn(&Ident) -> T,
+) -> TokenStream
+where
+    T: Into<TokenStream>,
+{
+    let item: syn::Item = syn::parse(input).expect("failed to parse input");
+    match item {
+        Item::Struct(ref struct_item) => match &struct_item.fields {
+            Fields::Named(fields) => {
+                let field_present = fields
+                    .named
+                    .iter()
+                    .filter_map(|f| f.ident.as_ref())
+                    .find(|ident| ident.to_owned() == field_name)
+                    .is_some();
+                if !field_present {
+                    return quote! {
+                        compile_error!(#error_message);
+                    }
+                    .into();
+                }
+
+                let name = &struct_item.ident;
+
+                return callback(name).into();
+            }
+            _ => {
+                return quote! {
+                    compile_error!(#error_message);
+                }
+                .into()
+            }
+        },
+        _ => {
+            return quote! {
+                compile_error!(#error_message);
+            }
+            .into()
+        }
+    }
+}
+
+#[proc_macro_derive(AltID)]
+pub fn alt_id_derive(input: TokenStream) -> TokenStream {
+    impl_getter_trait_for_type(
+        input,
+        "altid",
+        "AltID can only be used on structs with an altid field",
+        |ident| {
+            quote! {
+                impl Alternative for #ident {
+                    fn get_alt_id(&self) -> &str {
+                        self.altid.as_ref().map(String::as_str).unwrap_or_else(||"")
+                    }
+
+                }
+            }
+        },
+    )
+}
+
+#[proc_macro_derive(Pref)]
+pub fn pref_derive(input: TokenStream) -> TokenStream {
+    impl_getter_trait_for_type(
+        input,
+        "pref",
+        "Pref can only be used on structs with a pref field",
+        |ident| {
+            quote! {
+                impl Preferable for #ident {
+                    fn get_pref(&self) -> u8 {
+                        self.pref.unwrap_or_else(||100)
+                    }
+
+                }
+            }
+        },
+    )
+}
 
 // This macro is intended to ease the repetitive `Display` trait implementation.
 #[proc_macro_attribute]
@@ -10,7 +94,10 @@ pub fn vcard(_metadata: TokenStream, input: TokenStream) -> TokenStream {
     match item {
         Item::Struct(ref struct_item) => match &struct_item.fields {
             Fields::Named(fields) => {
-                let struct_name = &struct_item.ident.to_string().to_uppercase();
+                let mut struct_name = struct_item.ident.to_string().to_uppercase();
+                if struct_name == "VCARDURL" {
+                    struct_name = "URL".into();
+                }
                 let mut grp_stmt = quote! {
                     let name = #struct_name;
                     write!(f,"{}",name)?;

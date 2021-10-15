@@ -1,18 +1,212 @@
 use lazy_static;
 use regex::{self, Regex};
-use std::{
-    cell::RefCell,
-    fmt::Display,
-    io::{self, BufReader, Read},
-    rc::Rc,
-    str::FromStr,
-};
+use std::{ cell::RefCell, collections::{BTreeSet, HashMap}, fmt::Display, io::{self, BufReader, Read}, rc::Rc, str::FromStr};
 
 use strum_macros;
 
 use errors::VCardError;
 mod errors;
-use vcard_macro::vcard;
+use vcard_macro::{vcard, AltID,Pref};
+
+pub trait Alternative {
+    fn get_alt_id(&self) -> &str;
+}
+
+pub trait Preferable {
+    fn get_pref(&self) -> u8;
+}
+
+pub struct MultiAltIDContainer<T: Alternative> {
+    values: HashMap<String, T>,
+}
+
+impl<T: Alternative> MultiAltIDContainer<T> {
+    pub fn new() -> Self {
+        Self {
+            values: HashMap::new(),
+        }
+    }
+
+    pub fn add_value(&mut self, value: T) {
+        let alt_id = value.get_alt_id().to_string();
+        self.values.insert(alt_id, value);
+    }
+
+    pub fn values(&self) -> &HashMap<String, T> {
+        &self.values
+    }
+
+    pub fn take_values(self) -> HashMap<String, T> {
+        self.values
+    }
+}
+
+pub struct AltIDContainer<T: Alternative> {
+    alt_id: String,
+    values: Vec<T>,
+}
+
+impl<T: Alternative> AltIDContainer<T> {
+    pub fn new<I: Into<String>>(altid: I) -> Self {
+        AltIDContainer {
+            alt_id: altid.into(),
+            values: Vec::new(),
+        }
+    }
+
+    pub fn add_value(&mut self, item: T) -> Result<(), VCardError> {
+        if &self.alt_id != item.get_alt_id() {
+            return Err(VCardError::InvalidAltID {
+                expected_altid: self.alt_id.clone(),
+                actual_altid: item.get_alt_id().to_owned(),
+            });
+        }
+
+        self.values.push(item);
+
+        Ok(())
+    }
+
+    pub fn values(&self) -> &[T] {
+        &self.values
+    }
+
+    pub fn take_values(self) -> Vec<T> {
+        self.values
+    }
+}
+
+// pub struct VCard {
+//     pub version: Version,
+//     pub source: HashMap<String, Vec<Source>>,
+//     pub kind: Option<Kind>,
+//     pub xml: HashMap<String, Vec<Xml>>,
+//     pub fn_property: HashMap<String, Vec<FN>>,
+
+//     pub n: AltIDContainer<N>,
+
+//     pub nickname: HashMap<String, AltIDContainer<Nickname>>,
+
+//     pub photo: HashMap<String, AltIDContainer<Photo>>,
+
+//     pub bday: AltIDContainer<BDay>,
+//     pub anniversary: AltIDContainer<Anniversary>,
+//     pub gender: Option<Gender>,
+//     pub adr: HashMap<String, AltIDContainer<Adr>>,
+//     pub tel: HashMap<String, AltIDContainer<Tel>>,
+//     pub email: HashMap<String, AltIDContainer<Email>>,
+//     pub impp: HashMap<String, AltIDContainer<Impp>>,
+//     pub lang: HashMap<String, AltIDContainer<Lang>>,
+//     pub tz: Option<Tz>,
+//     pub geo: Option<Geo>,
+//     pub title: Option<Title>,
+//     pub role: Option<Role>,
+//     pub logo: Option<Logo>,
+//     pub org: Option<Org>,
+//     pub member: Option<Member>,
+//     pub related: Option<Related>,
+//     pub categories: Option<Categories>,
+//     pub note: Option<Note>,
+//     pub prodid: Option<ProdId>,
+//     pub rev: Option<Rev>,
+//     pub sound: Option<Sound>,
+//     pub uid: Option<Uid>,
+//     pub clientpidmap: Option<ClientPidMap>,
+//     pub url: Option<VcardURL>,
+//     pub key: Option<Key>,
+//     pub fburl: Option<FbURL>,
+//     pub caluri: Option<CalURI>,
+//     pub caladuri: Option<CalAdURI>,
+// }
+
+// impl VCard {
+//     // pub fn add_n(&mut self, item: N) -> Result<(), VCardError> {
+//     //     if self.n.is_empty() {
+//     //         self.n.push(item);
+//     //     } else {
+//     //         if item.altid == self.n.first().unwrap().altid {
+//     //             self.n.push(item);
+//     //         } else {
+//     //             return Err(VCardError::InvalidCardinality {
+//     //                 expected: 1,
+//     //                 property: "N".to_string(),
+//     //             });
+//     //         }
+//     //     }
+
+//     //     Ok(())
+//     // }
+// }
+
+fn write_vcard_property<S: ToString>(
+    f: &mut std::fmt::Formatter<'_>,
+    input: &Option<S>,
+) -> std::fmt::Result {
+    if let Some(item) = input {
+        write!(f, "{}", item.to_string())?;
+    }
+    Ok(())
+}
+
+fn write_vcard_altid_property<S: ToString>(
+    f: &mut std::fmt::Formatter<'_>,
+    input: &HashMap<&str, S>,
+) -> std::fmt::Result {
+    for (_altid, item) in input {
+        write!(f, "{}", item.to_string())?;
+    }
+    Ok(())
+}
+
+// impl<'a> Display for VCard {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         write!(f, "BEGIN:VCARD\r\n")?;
+//         write_vcard_property(f, &Some(&self.version))?;
+//         // write_vcard_altid_property(f, &self.source)?;
+
+//         // write_vcard_property(f, &self.kind)?;
+//         // write_vcard_property(f, &self.xml)?;
+//         // write_vcard_property(f, &self.fn_property)?;
+//         // write_vcard_property(f, &self.n)?;
+//         // write_vcard_property(f, &self.nickname)?;
+//         // write_vcard_property(f, &self.photo)?;
+
+//         // write_vcard_property(f, &self.bday)?;
+//         // write_vcard_property(f, &self.anniversary)?;
+//         // write_vcard_property(f, &self.gender)?;
+//         // write_vcard_property(f, &self.adr)?;
+//         // write_vcard_property(f, &self.tel)?;
+//         // write_vcard_property(f, &self.email)?;
+
+//         // write_vcard_property(f, &self.impp)?;
+//         // write_vcard_property(f, &self.lang)?;
+//         // write_vcard_property(f, &self.tz)?;
+//         // write_vcard_property(f, &self.geo)?;
+//         // write_vcard_property(f, &self.title)?;
+//         // write_vcard_property(f, &self.role)?;
+
+//         // write_vcard_property(f, &self.logo)?;
+//         // write_vcard_property(f, &self.org)?;
+//         // write_vcard_property(f, &self.member)?;
+//         // write_vcard_property(f, &self.related)?;
+//         // write_vcard_property(f, &self.categories)?;
+//         // write_vcard_property(f, &self.note)?;
+
+//         // write_vcard_property(f, &self.prodid)?;
+//         // write_vcard_property(f, &self.rev)?;
+//         // write_vcard_property(f, &self.sound)?;
+//         // write_vcard_property(f, &self.uid)?;
+//         // write_vcard_property(f, &self.clientpidmap)?;
+//         // write_vcard_property(f, &self.url)?;
+
+//         // write_vcard_property(f, &self.key)?;
+//         // write_vcard_property(f, &self.fburl)?;
+//         // write_vcard_property(f, &self.caluri)?;
+//         // write_vcard_property(f, &self.caladuri)?;
+
+//         write!(f, "END:VCARD\r\n")
+//     }
+// }
 
 /// A reader that reads vcard properties one by one.
 ///
@@ -122,12 +316,11 @@ impl Display for Pid {
     }
 }
 
-
 #[vcard]
 #[derive(Debug, PartialEq)]
-pub struct Kind{
+pub struct Kind {
     pub group: Option<String>,
-    pub value: KindValue
+    pub value: KindValue,
 }
 
 #[derive(strum_macros::AsRefStr, Debug, PartialEq)]
@@ -201,8 +394,16 @@ pub struct Version {
     pub value: VersionValue,
 }
 
+impl Default for Version {
+    fn default() -> Self {
+        Self {
+            value: VersionValue::V4,
+        }
+    }
+}
+
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, AltID)]
 pub struct Source {
     pub group: Option<String>,
     pub pid: Option<Pid>,
@@ -212,7 +413,7 @@ pub struct Source {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, Default)]
+#[derive(Debug, PartialEq, Default, AltID,Pref)]
 pub struct FN {
     pub group: Option<String>,
     pub altid: Option<String>,
@@ -224,7 +425,7 @@ pub struct FN {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, Default)]
+#[derive(Debug, PartialEq, Default, AltID)]
 pub struct N {
     pub altid: Option<String>,
     pub language: Option<String>,
@@ -239,7 +440,7 @@ pub struct N {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, AltID)]
 pub struct Nickname {
     pub group: Option<String>,
     pub altid: Option<String>,
@@ -253,7 +454,7 @@ pub struct Nickname {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, AltID)]
 pub struct Photo {
     pub group: Option<String>,
     pub altid: Option<String>,
@@ -266,7 +467,7 @@ pub struct Photo {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default, AltID)]
 pub struct BDay {
     pub altid: Option<String>,
     pub calscale: Option<String>,
@@ -276,7 +477,7 @@ pub struct BDay {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default, AltID)]
 pub struct Anniversary {
     pub altid: Option<String>,
     pub calscale: Option<String>,
@@ -285,7 +486,7 @@ pub struct Anniversary {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, AltID)]
 pub struct Adr {
     pub group: Option<String>,
     pub altid: Option<String>,
@@ -308,7 +509,7 @@ pub struct Adr {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default, AltID)]
 pub struct Tel {
     pub value_data_type: Option<ValueDataType>,
     pub type_param: Option<Vec<String>>,
@@ -320,7 +521,7 @@ pub struct Tel {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, Default)]
+#[derive(Debug, PartialEq, Default, AltID)]
 pub struct Email {
     pub group: Option<String>,
     pub altid: Option<String>,
@@ -333,7 +534,7 @@ pub struct Email {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default, AltID)]
 pub struct Impp {
     pub group: Option<String>,
     pub altid: Option<String>,
@@ -347,8 +548,8 @@ pub struct Impp {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
-pub struct Language {
+#[derive(Debug, PartialEq, Default, AltID)]
+pub struct Lang {
     pub group: Option<String>,
     pub altid: Option<String>,
     pub pid: Option<Pid>,
@@ -360,7 +561,7 @@ pub struct Language {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default, AltID)]
 pub struct Tz {
     pub group: Option<String>,
 
@@ -376,7 +577,7 @@ pub struct Tz {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, AltID)]
 pub struct Geo {
     pub group: Option<String>,
 
@@ -392,7 +593,7 @@ pub struct Geo {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, AltID)]
 pub struct Title {
     pub group: Option<String>,
 
@@ -408,7 +609,7 @@ pub struct Title {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, AltID)]
 pub struct Role {
     pub group: Option<String>,
 
@@ -424,7 +625,7 @@ pub struct Role {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, AltID)]
 pub struct Logo {
     pub group: Option<String>,
 
@@ -441,7 +642,7 @@ pub struct Logo {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, AltID)]
 pub struct Org {
     pub group: Option<String>,
 
@@ -458,7 +659,7 @@ pub struct Org {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, AltID)]
 pub struct Member {
     pub group: Option<String>,
 
@@ -471,7 +672,7 @@ pub struct Member {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, AltID)]
 pub struct Related {
     pub group: Option<String>,
 
@@ -488,7 +689,7 @@ pub struct Related {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, AltID)]
 pub struct Categories {
     pub group: Option<String>,
 
@@ -502,7 +703,7 @@ pub struct Categories {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, AltID)]
 pub struct Note {
     pub group: Option<String>,
 
@@ -532,7 +733,7 @@ pub struct Rev {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, AltID)]
 pub struct Sound {
     pub group: Option<String>,
 
@@ -565,7 +766,7 @@ pub struct ClientPidMap {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, AltID)]
 pub struct VcardURL {
     pub group: Option<String>,
     pub altid: Option<String>,
@@ -579,7 +780,7 @@ pub struct VcardURL {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, AltID)]
 pub struct FbURL {
     pub group: Option<String>,
     pub altid: Option<String>,
@@ -593,7 +794,7 @@ pub struct FbURL {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, AltID)]
 pub struct CalAdURI {
     pub group: Option<String>,
     pub altid: Option<String>,
@@ -607,7 +808,7 @@ pub struct CalAdURI {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, AltID)]
 pub struct CalURI {
     pub group: Option<String>,
     pub altid: Option<String>,
@@ -620,7 +821,7 @@ pub struct CalURI {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, AltID)]
 pub struct Key {
     pub group: Option<String>,
 
@@ -677,7 +878,7 @@ pub enum Property {
     #[strum(serialize = "impp")]
     Impp(Impp),
     #[strum(serialize = "lang")]
-    Lang(Language),
+    Lang(Lang),
     #[strum(serialize = "tz")]
     Tz(Tz),
     #[strum(serialize = "geo")]
@@ -977,7 +1178,7 @@ impl FromStr for Property {
                     value,
                 }),
 
-                "lang" => Self::Lang(Language {
+                "lang" => Self::Lang(Lang {
                     altid,
                     pid,
                     pref,
@@ -1370,6 +1571,31 @@ impl<R: io::Read> VCardReader<R> {
         }
     }
 
+    // pub fn parse_vcard(&mut self) -> Result<VCard, VCardError> {
+    //     let begin_property = self.read_property()?;
+    //     match begin_property {
+    //         Property::Begin { value } => {
+    //             if &value[..] != "VCARD" {
+    //                 return Err(VCardError::InvalidBeginProperty);
+    //             }
+    //         }
+    //         _ => return Err(VCardError::InvalidBeginProperty),
+    //     }
+
+    //     loop {
+    //         let prop = self.read_property()?;
+    //         match prop {
+    //             Property::Begin { value: _ } => {
+    //                 return Err(VCardError::InvalidCardinality {
+    //                     expected: 1,
+    //                     property: "BEGIN".into(),
+    //                 })
+    //             }
+    //             _ => unimplemented!(),
+    //         }
+    //     }
+    // }
+
     fn inspect_next_line(&mut self) -> Result<LineInspection, VCardError> {
         let mut buf = [0, 0];
         // read the next two bytes. If the next byte continues with a whicespace char (space (U+0020) or horizontal tab (U+0009))
@@ -1545,6 +1771,7 @@ mod tests {
         e.value = "mail@example.com".into();
 
         assert_eq!("foo.EMAIL;ALTID=asdf:mail@example.com\r\n", e.to_string());
+
 
         Ok(())
     }

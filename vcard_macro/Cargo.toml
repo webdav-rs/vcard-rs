@@ -13,4 +13,3 @@ proc-macro = true
 [dependencies]
 syn = {version="1",features=["full"]}
 quote = "1"
-convert_case = "0.4.0"

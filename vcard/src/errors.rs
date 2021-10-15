@@ -55,6 +55,21 @@ pub enum VCardError {
 
     #[error("Exceeded maximum logical line length of {0}")]
     MaxLineLengthExceeded(u64),
+
+    #[error("first property of a vcard must be BEGIN:VCARD")]
+    InvalidBeginProperty,
+
+    #[error("only {expected} amount of {property} are valid in a vcard")]
+    InvalidCardinality{
+        expected: u64,
+        property: String,
+    },
+
+    #[error("expected item to have altid {expected_altid}, but got {actual_altid}")]
+    InvalidAltID{
+        expected_altid: String,
+        actual_altid: String,
+    }
 }
 
 impl VCardError {
