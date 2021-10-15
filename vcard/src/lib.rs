@@ -1,12 +1,19 @@
 use lazy_static;
 use regex::{self, Regex};
-use std::{ cell::RefCell, collections::{BTreeSet, HashMap}, fmt::Display, io::{self, BufReader, Read}, rc::Rc, str::FromStr};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    fmt::Display,
+    io::{self, BufReader, Read},
+    rc::Rc,
+    str::FromStr,
+};
 
 use strum_macros;
 
 use errors::VCardError;
 mod errors;
-use vcard_macro::{vcard, AltID,Pref};
+use vcard_macro::{vcard, AltID, Pref};
 
 pub trait Alternative {
     fn get_alt_id(&self) -> &str;
@@ -16,197 +23,255 @@ pub trait Preferable {
     fn get_pref(&self) -> u8;
 }
 
-pub struct MultiAltIDContainer<T: Alternative> {
-    values: HashMap<String, T>,
+pub struct MultiAltIDContainer<T: Alternative>(HashMap<String, AltIDContainer<T>>);
+
+impl<T: Alternative + Display> Display for MultiAltIDContainer<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for val in self.0.values() {
+            val.fmt(f)?;
+        }
+        Ok(())
+    }
 }
 
 impl<T: Alternative> MultiAltIDContainer<T> {
     pub fn new() -> Self {
-        Self {
-            values: HashMap::new(),
+        Self(HashMap::new())
+    }
+
+    pub fn add_value(&mut self, value: T) -> Result<(), VCardError> {
+        if self.0.contains_key(value.get_alt_id()) {
+            let container = self.0.get_mut(value.get_alt_id()).unwrap();
+            container.add_value(value)?;
+        } else {
+            let altid = value.get_alt_id().to_string();
+            let container = AltIDContainer::from_vec(vec![value]);
+            self.0.insert(altid, container);
         }
+
+        Ok(())
     }
 
-    pub fn add_value(&mut self, value: T) {
-        let alt_id = value.get_alt_id().to_string();
-        self.values.insert(alt_id, value);
+    pub fn values(&self) -> &HashMap<String, AltIDContainer<T>> {
+        &self.0
     }
 
-    pub fn values(&self) -> &HashMap<String, T> {
-        &self.values
-    }
-
-    pub fn take_values(self) -> HashMap<String, T> {
-        self.values
+    pub fn take_values(self) -> HashMap<String, AltIDContainer<T>> {
+        self.0
     }
 }
 
-pub struct AltIDContainer<T: Alternative> {
-    alt_id: String,
-    values: Vec<T>,
+impl<T: Alternative + Preferable> MultiAltIDContainer<T> {
+    /// returns the prefered value.
+    ///
+    /// Preference values are ascending. No guarantees are made when multiple values have the same `pref`
+    pub fn get_prefered_value(&self) -> Option<&T> {
+        let mut prefered_item = None;
+        for (_key, container) in self.0.iter() {
+            let container_prefered_item = if let Some(cpi) = container.get_prefered_value() {
+                cpi
+            } else {
+                continue;
+            };
+            if prefered_item.is_none() {
+                prefered_item = Some(container_prefered_item);
+            } else if prefered_item.unwrap().get_alt_id() > container_prefered_item.get_alt_id() {
+                prefered_item = Some(container_prefered_item);
+            }
+        }
+
+        prefered_item
+    }
+}
+
+/// In vcard, if multiple entries share the same type and altid, they are considered
+/// to be one record. This means, all entries in an `AltIDContainer` are considered one record as well.
+pub struct AltIDContainer<T: Alternative>(Vec<T>);
+
+impl<T> Display for AltIDContainer<T>
+where
+    T: Alternative + Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for item in self.0.iter() {
+            item.fmt(f)?;
+        }
+        Ok(())
+    }
 }
 
 impl<T: Alternative> AltIDContainer<T> {
-    pub fn new<I: Into<String>>(altid: I) -> Self {
-        AltIDContainer {
-            alt_id: altid.into(),
-            values: Vec::new(),
-        }
+    pub fn new() -> Self {
+        AltIDContainer(Vec::new())
     }
 
+    pub fn from_vec(items: Vec<T>) -> Self {
+        AltIDContainer(items)
+    }
+
+    /// Adds a new value to this container.
+    ///
+    /// This will fail if `item` has a different `altid` than previous elements of this container.
+    /// In case the container does not have any elemts, it will simply be added to the collection.
     pub fn add_value(&mut self, item: T) -> Result<(), VCardError> {
-        if &self.alt_id != item.get_alt_id() {
+        if self.0.len() == 0 {
+            self.0.push(item);
+            return Ok(());
+        }
+        let prev_altid = self.0.get(0).unwrap().get_alt_id();
+        if prev_altid != item.get_alt_id() {
             return Err(VCardError::InvalidAltID {
-                expected_altid: self.alt_id.clone(),
+                expected_altid: prev_altid.to_string(),
                 actual_altid: item.get_alt_id().to_owned(),
             });
         }
 
-        self.values.push(item);
+        self.0.push(item);
 
         Ok(())
     }
 
     pub fn values(&self) -> &[T] {
-        &self.values
+        &self.0
     }
 
     pub fn take_values(self) -> Vec<T> {
-        self.values
+        self.0
     }
 }
 
-// pub struct VCard {
-//     pub version: Version,
-//     pub source: HashMap<String, Vec<Source>>,
-//     pub kind: Option<Kind>,
-//     pub xml: HashMap<String, Vec<Xml>>,
-//     pub fn_property: HashMap<String, Vec<FN>>,
+impl<T> AltIDContainer<T>
+where
+    T: Alternative + Preferable,
+{
+    /// returns the prefered value.
+    ///
+    /// Preference values are ascending. No guarantees are made when multiple values have the same `pref`
+    pub fn get_prefered_value(&self) -> Option<&T> {
+        let mut prefered_item = None;
+        for item in self.0.iter() {
+            if prefered_item.is_none() {
+                prefered_item = Some(item);
+                continue;
+            }
 
-//     pub n: AltIDContainer<N>,
+            if prefered_item.unwrap().get_alt_id() > item.get_alt_id() {
+                prefered_item = Some(item);
+            }
+        }
 
-//     pub nickname: HashMap<String, AltIDContainer<Nickname>>,
+        prefered_item
+    }
+}
 
-//     pub photo: HashMap<String, AltIDContainer<Photo>>,
 
-//     pub bday: AltIDContainer<BDay>,
-//     pub anniversary: AltIDContainer<Anniversary>,
-//     pub gender: Option<Gender>,
-//     pub adr: HashMap<String, AltIDContainer<Adr>>,
-//     pub tel: HashMap<String, AltIDContainer<Tel>>,
-//     pub email: HashMap<String, AltIDContainer<Email>>,
-//     pub impp: HashMap<String, AltIDContainer<Impp>>,
-//     pub lang: HashMap<String, AltIDContainer<Lang>>,
-//     pub tz: Option<Tz>,
-//     pub geo: Option<Geo>,
-//     pub title: Option<Title>,
-//     pub role: Option<Role>,
-//     pub logo: Option<Logo>,
-//     pub org: Option<Org>,
-//     pub member: Option<Member>,
-//     pub related: Option<Related>,
-//     pub categories: Option<Categories>,
-//     pub note: Option<Note>,
-//     pub prodid: Option<ProdId>,
-//     pub rev: Option<Rev>,
-//     pub sound: Option<Sound>,
-//     pub uid: Option<Uid>,
-//     pub clientpidmap: Option<ClientPidMap>,
-//     pub url: Option<VcardURL>,
-//     pub key: Option<Key>,
-//     pub fburl: Option<FbURL>,
-//     pub caluri: Option<CalURI>,
-//     pub caladuri: Option<CalAdURI>,
-// }
+/// Represents a single VCard.
+/// 
+/// For more informatin about the fields, see https://datatracker.ietf.org/doc/html/rfc6350#section-6
+pub struct VCard {
+    pub version: Version,
+    pub source: MultiAltIDContainer<Source>,
+    pub kind: Option<Kind>,
+    pub xml: MultiAltIDContainer<Xml>,
+    pub fn_property: MultiAltIDContainer<FN>,
 
-// impl VCard {
-//     // pub fn add_n(&mut self, item: N) -> Result<(), VCardError> {
-//     //     if self.n.is_empty() {
-//     //         self.n.push(item);
-//     //     } else {
-//     //         if item.altid == self.n.first().unwrap().altid {
-//     //             self.n.push(item);
-//     //         } else {
-//     //             return Err(VCardError::InvalidCardinality {
-//     //                 expected: 1,
-//     //                 property: "N".to_string(),
-//     //             });
-//     //         }
-//     //     }
+    pub n: AltIDContainer<N>,
 
-//     //     Ok(())
-//     // }
-// }
+    pub nickname: MultiAltIDContainer<Nickname>,
 
-fn write_vcard_property<S: ToString>(
+    pub photo: MultiAltIDContainer<Photo>,
+
+    pub bday: AltIDContainer<BDay>,
+    pub anniversary: AltIDContainer<Anniversary>,
+    pub gender: Option<Gender>,
+    pub adr: MultiAltIDContainer<Adr>,
+    pub tel: MultiAltIDContainer<Tel>,
+    pub email: MultiAltIDContainer<Email>,
+    pub impp: MultiAltIDContainer<Impp>,
+    pub lang: MultiAltIDContainer<Lang>,
+
+    pub tz: MultiAltIDContainer<Tz>,
+    pub geo: MultiAltIDContainer<Geo>,
+    pub title: MultiAltIDContainer<Title>,
+    pub role: MultiAltIDContainer<Role>,
+    pub logo: MultiAltIDContainer<Logo>,
+    pub org: MultiAltIDContainer<Org>,
+    pub member: MultiAltIDContainer<Member>,
+    pub related: MultiAltIDContainer<Related>,
+    pub categories: MultiAltIDContainer<Categories>,
+    pub note: MultiAltIDContainer<Note>,
+
+    pub prodid: Option<ProdId>,
+    pub rev: Option<Rev>,
+    pub sound: MultiAltIDContainer<Sound>,
+    pub uid: Option<Uid>,
+    pub clientpidmap: Option<ClientPidMap>,
+
+    pub url: MultiAltIDContainer<VcardURL>,
+    pub key: MultiAltIDContainer<Key>,
+    pub fburl: MultiAltIDContainer<FbURL>,
+    pub caluri: MultiAltIDContainer<CalURI>,
+    pub caladuri: MultiAltIDContainer<CalAdURI>,
+}
+
+fn write_vcard_property<D: Display>(
     f: &mut std::fmt::Formatter<'_>,
-    input: &Option<S>,
+    input: &Option<D>,
 ) -> std::fmt::Result {
     if let Some(item) = input {
-        write!(f, "{}", item.to_string())?;
+        item.fmt(f)?;
     }
     Ok(())
 }
 
-fn write_vcard_altid_property<S: ToString>(
-    f: &mut std::fmt::Formatter<'_>,
-    input: &HashMap<&str, S>,
-) -> std::fmt::Result {
-    for (_altid, item) in input {
-        write!(f, "{}", item.to_string())?;
+impl<'a> Display for VCard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BEGIN:VCARD\r\n")?;
+        write_vcard_property(f, &Some(&self.version))?;
+
+        self.source.fmt(f)?;
+        write_vcard_property(f, &self.kind)?;
+
+        self.xml.fmt(f)?;
+        self.fn_property.fmt(f)?;
+        self.n.fmt(f)?;
+        self.nickname.fmt(f)?;
+        self.photo.fmt(f)?;
+        self.bday.fmt(f)?;
+        self.anniversary.fmt(f)?;
+
+        write_vcard_property(f, &self.gender)?;
+
+        self.adr.fmt(f)?;
+        self.tel.fmt(f)?;
+        self.email.fmt(f)?;
+        self.impp.fmt(f)?;
+        self.lang.fmt(f)?;
+        self.tz.fmt(f)?;
+        self.geo.fmt(f)?;
+        self.title.fmt(f)?;
+        self.role.fmt(f)?;
+        self.logo.fmt(f)?;
+        self.org.fmt(f)?;
+        self.member.fmt(f)?;
+        self.related.fmt(f)?;
+        self.categories.fmt(f)?;
+        self.note.fmt(f)?;
+
+        write_vcard_property(f, &self.prodid)?;
+        write_vcard_property(f, &self.rev)?;
+        write_vcard_property(f, &self.uid)?;
+        write_vcard_property(f, &self.clientpidmap)?;
+
+        self.sound.fmt(f)?;
+        self.url.fmt(f)?;
+        self.key.fmt(f)?;
+        self.fburl.fmt(f)?;
+        self.caluri.fmt(f)?;
+        self.caladuri.fmt(f)?;
+        write!(f, "END:VCARD\r\n")
     }
-    Ok(())
 }
-
-// impl<'a> Display for VCard {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         write!(f, "BEGIN:VCARD\r\n")?;
-//         write_vcard_property(f, &Some(&self.version))?;
-//         // write_vcard_altid_property(f, &self.source)?;
-
-//         // write_vcard_property(f, &self.kind)?;
-//         // write_vcard_property(f, &self.xml)?;
-//         // write_vcard_property(f, &self.fn_property)?;
-//         // write_vcard_property(f, &self.n)?;
-//         // write_vcard_property(f, &self.nickname)?;
-//         // write_vcard_property(f, &self.photo)?;
-
-//         // write_vcard_property(f, &self.bday)?;
-//         // write_vcard_property(f, &self.anniversary)?;
-//         // write_vcard_property(f, &self.gender)?;
-//         // write_vcard_property(f, &self.adr)?;
-//         // write_vcard_property(f, &self.tel)?;
-//         // write_vcard_property(f, &self.email)?;
-
-//         // write_vcard_property(f, &self.impp)?;
-//         // write_vcard_property(f, &self.lang)?;
-//         // write_vcard_property(f, &self.tz)?;
-//         // write_vcard_property(f, &self.geo)?;
-//         // write_vcard_property(f, &self.title)?;
-//         // write_vcard_property(f, &self.role)?;
-
-//         // write_vcard_property(f, &self.logo)?;
-//         // write_vcard_property(f, &self.org)?;
-//         // write_vcard_property(f, &self.member)?;
-//         // write_vcard_property(f, &self.related)?;
-//         // write_vcard_property(f, &self.categories)?;
-//         // write_vcard_property(f, &self.note)?;
-
-//         // write_vcard_property(f, &self.prodid)?;
-//         // write_vcard_property(f, &self.rev)?;
-//         // write_vcard_property(f, &self.sound)?;
-//         // write_vcard_property(f, &self.uid)?;
-//         // write_vcard_property(f, &self.clientpidmap)?;
-//         // write_vcard_property(f, &self.url)?;
-
-//         // write_vcard_property(f, &self.key)?;
-//         // write_vcard_property(f, &self.fburl)?;
-//         // write_vcard_property(f, &self.caluri)?;
-//         // write_vcard_property(f, &self.caladuri)?;
-
-//         write!(f, "END:VCARD\r\n")
-//     }
-// }
 
 /// A reader that reads vcard properties one by one.
 ///
@@ -413,7 +478,7 @@ pub struct Source {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, Default, AltID,Pref)]
+#[derive(Debug, PartialEq, Default, AltID, Pref)]
 pub struct FN {
     pub group: Option<String>,
     pub altid: Option<String>,
@@ -454,7 +519,7 @@ pub struct Nickname {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID)]
+#[derive(Debug, PartialEq, AltID, Pref)]
 pub struct Photo {
     pub group: Option<String>,
     pub altid: Option<String>,
@@ -486,7 +551,7 @@ pub struct Anniversary {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID)]
+#[derive(Debug, PartialEq, AltID, Pref)]
 pub struct Adr {
     pub group: Option<String>,
     pub altid: Option<String>,
@@ -509,7 +574,7 @@ pub struct Adr {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, Default, AltID)]
+#[derive(Debug, PartialEq, Default, AltID, Pref)]
 pub struct Tel {
     pub value_data_type: Option<ValueDataType>,
     pub type_param: Option<Vec<String>>,
@@ -521,7 +586,7 @@ pub struct Tel {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, Default, AltID)]
+#[derive(Debug, PartialEq, Default, AltID, Pref)]
 pub struct Email {
     pub group: Option<String>,
     pub altid: Option<String>,
@@ -534,7 +599,7 @@ pub struct Email {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, Default, AltID)]
+#[derive(Debug, PartialEq, Default, AltID, Pref)]
 pub struct Impp {
     pub group: Option<String>,
     pub altid: Option<String>,
@@ -548,7 +613,7 @@ pub struct Impp {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, Default, AltID)]
+#[derive(Debug, PartialEq, Default, AltID, Pref)]
 pub struct Lang {
     pub group: Option<String>,
     pub altid: Option<String>,
@@ -561,7 +626,7 @@ pub struct Lang {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, Default, AltID)]
+#[derive(Debug, PartialEq, Default, AltID, Pref)]
 pub struct Tz {
     pub group: Option<String>,
 
@@ -577,7 +642,7 @@ pub struct Tz {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID)]
+#[derive(Debug, PartialEq, AltID, Pref)]
 pub struct Geo {
     pub group: Option<String>,
 
@@ -593,7 +658,7 @@ pub struct Geo {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID)]
+#[derive(Debug, PartialEq, AltID, Pref)]
 pub struct Title {
     pub group: Option<String>,
 
@@ -609,7 +674,7 @@ pub struct Title {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID)]
+#[derive(Debug, PartialEq, AltID, Pref)]
 pub struct Role {
     pub group: Option<String>,
 
@@ -625,7 +690,7 @@ pub struct Role {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID)]
+#[derive(Debug, PartialEq, AltID, Pref)]
 pub struct Logo {
     pub group: Option<String>,
 
@@ -642,7 +707,7 @@ pub struct Logo {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID)]
+#[derive(Debug, PartialEq, AltID, Pref)]
 pub struct Org {
     pub group: Option<String>,
 
@@ -659,7 +724,7 @@ pub struct Org {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID)]
+#[derive(Debug, PartialEq, AltID, Pref)]
 pub struct Member {
     pub group: Option<String>,
 
@@ -672,7 +737,7 @@ pub struct Member {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID)]
+#[derive(Debug, PartialEq, AltID, Pref)]
 pub struct Related {
     pub group: Option<String>,
 
@@ -837,8 +902,9 @@ pub struct Key {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, AltID)]
 pub struct Xml {
+    pub altid: Option<String>,
     pub group: Option<String>,
     pub value: String,
 }
@@ -1379,7 +1445,11 @@ impl FromStr for Property {
                     mediatype,
                     value: parse_url(value)?,
                 }),
-                "xml" => Self::Xml(Xml { value, group }),
+                "xml" => Self::Xml(Xml {
+                    altid,
+                    value,
+                    group,
+                }),
                 _ => {
                     if !name.starts_with("X-") && !name.starts_with("x-") {
                         return Err(VCardError::InvalidName {
@@ -1771,7 +1841,6 @@ mod tests {
         e.value = "mail@example.com".into();
 
         assert_eq!("foo.EMAIL;ALTID=asdf:mail@example.com\r\n", e.to_string());
-
 
         Ok(())
     }
