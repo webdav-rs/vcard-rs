@@ -74,20 +74,5 @@ pub enum VCardError {
         actual_altid: String,
     },
     #[error("invalid syntax for property {property}: {message}")]
-    InvalidSyntax{
-        message: String,
-        property: String,
-    }
-}
-
-impl VCardError {
-    pub(crate) fn url_parse_error<I: Into<String>>(
-        original_error: url::ParseError,
-        raw: I,
-    ) -> Self {
-        Self::UrlParseError {
-            original_error,
-            raw_url: raw.into(),
-        }
-    }
+    InvalidSyntax { message: String, property: String },
 }

@@ -98,14 +98,6 @@ fn filter_and_transform<A: AsRef<str>>(input: A) -> Option<String> {
     }
 }
 
-fn parse_url<A: AsRef<str>>(input: A) -> Result<url::Url, VCardError> {
-    input
-        .as_ref()
-        .replace(r"\:", ":") // we do this because google incorrectly escapes colons
-        .parse()
-        .map_err(|e| VCardError::url_parse_error(e, input.as_ref()))
-}
-
 fn parse_parameters(raw: &str) -> Result<Vec<Parameter>, VCardError> {
     let raw = raw.trim_start_matches(";");
     let mut result = Vec::new();
@@ -159,7 +151,7 @@ fn escaped_split(item: &str, split: char) -> impl Iterator<Item = String> {
 }
 
 lazy_static::lazy_static! {
-    static ref RE: Regex = Regex::new(r"(?P<group>[^;:]+\.)?(?P<name>[^;:]+)(?P<parameter>;[^:]+)*:(?P<value>.+)").unwrap();
+    static ref RE: Regex = Regex::new(r"(?P<group>[^;:]+\.)?(?P<name>[^;:]+)(?P<parameter>;[^:]+)*:(?P<value>.*)").unwrap();
 }
 impl FromStr for Property {
     type Err = VCardError;
@@ -253,7 +245,7 @@ impl FromStr for Property {
                     altid,
                     mediatype,
                     group,
-                    value: parse_url(value)?,
+                    value: value,
                 }),
                 "kind" => Self::Kind(Kind {
                     group,
@@ -309,7 +301,7 @@ impl FromStr for Property {
                     type_param,
                     value_data_type,
                     pref,
-                    value: parse_url(value)?,
+                    value: value,
                 }),
                 "bday" => Self::BDay(BDay {
                     altid,
@@ -431,7 +423,7 @@ impl FromStr for Property {
                     type_param,
                     mediatype,
                     group,
-                    value: parse_url(value)?,
+                    value,
                 }),
                 "title" => Self::Title(Title {
                     altid,
@@ -483,7 +475,7 @@ impl FromStr for Property {
                     pref,
                     group,
                     mediatype,
-                    value: parse_url(value)?,
+                    value,
                 }),
                 "related" => Self::Related(Related {
                     altid,
@@ -505,7 +497,7 @@ impl FromStr for Property {
                     language,
                     mediatype,
                     group,
-                    value: parse_url(value)?,
+                    value,
                 }),
                 "note" => Self::Note(Note {
                     altid,
@@ -528,7 +520,7 @@ impl FromStr for Property {
                     language,
                     mediatype,
                     group,
-                    value: parse_url(value)?,
+                    value,
                 }),
                 "uid" => Self::Uid(Uid {
                     value_data_type,
@@ -544,13 +536,13 @@ impl FromStr for Property {
                             raw_line: value.clone(),
                         }
                     })??;
-                    let global_identifier = split.next().map(parse_url).ok_or_else(|| {
+                    let global_identifier = split.next().map(String::from).ok_or_else(|| {
                         VCardError::InvalidLine {
                             reason:
                                 "expected clientpidmap value to have two parts separated by ';'",
                             raw_line: value.clone(),
                         }
-                    })??;
+                    })?;
                     Self::ClientPidMap(ClientPidMap {
                         value: global_identifier,
                         pid_digit: pid,
@@ -565,7 +557,7 @@ impl FromStr for Property {
                     value_data_type,
                     type_param,
                     mediatype,
-                    value: parse_url(value)?,
+                    value,
                 }),
                 "key" => Self::Key(Key {
                     group,
@@ -585,7 +577,7 @@ impl FromStr for Property {
                     value_data_type,
                     type_param,
                     mediatype,
-                    value: parse_url(value)?,
+                    value,
                 }),
                 "caladuri" => Self::CalAdUri(CalAdURI {
                     group,
@@ -595,7 +587,7 @@ impl FromStr for Property {
                     value_data_type,
                     type_param,
                     mediatype,
-                    value: parse_url(value)?,
+                    value,
                 }),
                 "caluri" => Self::CalUri(CalURI {
                     group,
@@ -605,7 +597,7 @@ impl FromStr for Property {
                     value_data_type,
                     type_param,
                     mediatype,
-                    value: parse_url(value)?,
+                    value,
                 }),
                 "xml" => Self::Xml(Xml {
                     altid,

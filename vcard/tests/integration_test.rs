@@ -123,7 +123,7 @@ fn test() -> Result<(), Box<dyn Error>> {
             })
             .url(VcardURL {
                 group: Some("item1".into()),
-                value: "http://www.google.com/profiles/xxxxx".parse()?,
+                value: "http\\://www.google.com/profiles/xxxxx".into(),
                 altid: None,
                 pid: None,
                 pref: None,
@@ -149,6 +149,128 @@ fn test() -> Result<(), Box<dyn Error>> {
             })
             .categories(Categories {
                 value: vec!["Freunde".into(), "myContacts".into(), "starred".into()],
+                ..Default::default()
+            })
+            .build(),
+    );
+
+    test_table.insert(
+        "google_2.vcf",
+        VCard::new(VersionValue::V3)
+            .fn_property(FN {
+                value: "Dr. Heinrich Kasper Vom Tosafjord Von und Zu".into(),
+                ..Default::default()
+            })
+            .n(N {
+                surenames: vec!["Vom Tosafjord".into()],
+                given_names: vec!["Heinrich".into()],
+                honorific_prefixes: vec!["Dr.".into()],
+                honorific_suffixes: vec!["Von und Zu".into()],
+                additional_names: vec!["Kasper".into()],
+                ..Default::default()
+            })?
+            .nickname(Nickname {
+                value: vec!["Knödel".into()],
+                ..Default::default()
+            })
+            .proprietary(ProprietaryProperty {
+                name: "X-PHONETIC-FIRST-NAME".into(),
+                value: "Henry".into(),
+                ..Default::default()
+            })
+            .proprietary(ProprietaryProperty {
+                name: "X-PHONETIC-LAST-NAME".into(),
+                value: "VTF".into(),
+                ..Default::default()
+            })
+            .email(Email {
+                type_param: Some(vec!["INTERNET".into(), "HOME".into()]),
+                value: "heinrich@example.com".into(),
+                ..Default::default()
+            })
+            .proprietary(ProprietaryProperty {
+                name: "X-JABBER".into(),
+                value: "heinrich@jabber.com".into(),
+                group: Some("item1".into()),
+                ..Default::default()
+            })
+            .proprietary(ProprietaryProperty {
+                name: "X-ABLabel".into(),
+                group: Some("item1".into()),
+                ..Default::default()
+            })
+            .tel(Tel {
+                type_param: Some(vec!["HOME".into()]),
+                value: "00 0000".into(),
+                ..Default::default()
+            })
+            .adr(Adr {
+                type_param: Some(vec!["HOME".into()]),
+                po_box: vec!["7".into()],
+                postal_code: vec!["550201".into()],
+                city: vec!["Achundkrach".into()],
+                street: vec!["Auf dem Land 3".into()],
+                country: vec!["DE".into()],
+                ..Default::default()
+            })
+            .org(Org {
+                value: vec!["test gmbh".into(), "it".into()],
+                group: Some("item2".into()),
+                ..Default::default()
+            })
+            .proprietary(ProprietaryProperty {
+                name: "X-ABLabel".into(),
+                group: Some("item2".into()),
+                ..Default::default()
+            })
+            .title(Title {
+                value: "manager".into(),
+                group: Some("item3".into()),
+                ..Default::default()
+            })
+            .proprietary(ProprietaryProperty {
+                name: "X-ABLabel".into(),
+                group: Some("item3".into()),
+                ..Default::default()
+            })
+            .bday(BDay {
+                value: "20180301".into(),
+                ..Default::default()
+            })?
+            .url(VcardURL {
+                group: Some("item4".into()),
+                value: "www.example.com".parse()?,
+                altid: None,
+                pid: None,
+                mediatype: None,
+                pref: None,
+                type_param: None,
+                value_data_type: None,
+            })
+            .proprietary(ProprietaryProperty {
+                name: "X-ABLabel".into(),
+                group: Some("item4".into()),
+                value: "BLOG".into(),
+                ..Default::default()
+            })
+            .proprietary(ProprietaryProperty {
+                name: "X-ABRELATEDNAMES".into(),
+                group: Some("item5".into()),
+                value: "fiona".into(),
+                ..Default::default()
+            })
+            .proprietary(ProprietaryProperty {
+                name: "X-ABLabel".into(),
+                group: Some("item5".into()),
+                value: "_$!<Sister>!$_".into(),
+                ..Default::default()
+            })
+            .note(Note {
+                value: "ist eine katze\\nirgendeinlabel: testfeld".into(),
+                ..Default::default()
+            })
+            .categories(Categories {
+                value: vec!["myContacts".into()],
                 ..Default::default()
             })
             .build(),

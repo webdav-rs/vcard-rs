@@ -30,6 +30,15 @@ pub struct Kind {
     pub value: KindValue,
 }
 
+impl Default for Kind {
+    fn default() -> Self {
+        Self {
+            group: Default::default(),
+            value: KindValue::Individual,
+        }
+    }
+}
+
 #[derive(strum_macros::AsRefStr, Debug, PartialEq)]
 pub enum KindValue {
     #[strum(serialize = "individual")]
@@ -73,7 +82,7 @@ pub enum Sex {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 pub struct Gender {
     pub sex: Option<Sex>,
     pub identity_component: Option<String>,
@@ -110,13 +119,13 @@ impl Default for Version {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID)]
+#[derive(Debug, PartialEq, AltID,Default)]
 pub struct Source {
     pub group: Option<String>,
     pub pid: Option<Pid>,
     pub altid: Option<String>,
     pub mediatype: Option<String>,
-    pub value: url::Url,
+    pub value: String,
 }
 
 #[vcard]
@@ -147,7 +156,7 @@ pub struct N {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID)]
+#[derive(Debug, PartialEq, AltID, Default)]
 pub struct Nickname {
     pub group: Option<String>,
     pub altid: Option<String>,
@@ -161,7 +170,7 @@ pub struct Nickname {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID, Pref)]
+#[derive(Debug, PartialEq, AltID, Pref,Default)]
 pub struct Photo {
     pub group: Option<String>,
     pub altid: Option<String>,
@@ -170,7 +179,7 @@ pub struct Photo {
     pub mediatype: Option<String>,
     pub pref: Option<u8>,
     pub pid: Option<Pid>,
-    pub value: url::Url,
+    pub value: String,
 }
 
 #[vcard]
@@ -284,7 +293,7 @@ pub struct Tz {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID, Pref)]
+#[derive(Debug, PartialEq, AltID, Pref,Default)]
 pub struct Geo {
     pub group: Option<String>,
 
@@ -296,11 +305,11 @@ pub struct Geo {
 
     pub mediatype: Option<String>,
 
-    pub value: url::Url,
+    pub value: String,
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID, Pref)]
+#[derive(Debug, PartialEq, AltID, Pref, Default)]
 pub struct Title {
     pub group: Option<String>,
 
@@ -316,7 +325,7 @@ pub struct Title {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID, Pref)]
+#[derive(Debug, PartialEq, AltID, Pref,Default)]
 pub struct Role {
     pub group: Option<String>,
 
@@ -332,7 +341,7 @@ pub struct Role {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID, Pref)]
+#[derive(Debug, PartialEq, AltID, Pref,Default)]
 pub struct Logo {
     pub group: Option<String>,
 
@@ -345,7 +354,7 @@ pub struct Logo {
     pub language: Option<String>,
     pub mediatype: Option<String>,
 
-    pub value: url::Url,
+    pub value: String,
 }
 
 #[vcard]
@@ -366,7 +375,7 @@ pub struct Org {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID, Pref)]
+#[derive(Debug, PartialEq, AltID, Pref,Default)]
 pub struct Member {
     pub group: Option<String>,
 
@@ -375,11 +384,11 @@ pub struct Member {
     pub pref: Option<u8>,
     pub mediatype: Option<String>,
 
-    pub value: url::Url,
+    pub value: String,
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID, Pref)]
+#[derive(Debug, PartialEq, AltID, Pref,Default)]
 pub struct Related {
     pub group: Option<String>,
 
@@ -426,21 +435,21 @@ pub struct Note {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq,Default)]
 pub struct ProdId {
     pub group: Option<String>,
     pub value: String,
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq,Default)]
 pub struct Rev {
     pub group: Option<String>,
     pub value: String,
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID)]
+#[derive(Debug, PartialEq, AltID,Default)]
 pub struct Sound {
     pub group: Option<String>,
 
@@ -453,11 +462,11 @@ pub struct Sound {
     pub language: Option<String>,
     pub mediatype: Option<String>,
 
-    pub value: url::Url,
+    pub value: String,
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq,Default)]
 pub struct Uid {
     pub group: Option<String>,
     pub value_data_type: Option<ValueDataType>,
@@ -465,15 +474,15 @@ pub struct Uid {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq,Default)]
 pub struct ClientPidMap {
     pub group: Option<String>,
     pub pid_digit: u8,
-    pub value: url::Url,
+    pub value: String,
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID)]
+#[derive(Debug, PartialEq, AltID,Default)]
 pub struct VcardURL {
     pub group: Option<String>,
     pub altid: Option<String>,
@@ -483,11 +492,11 @@ pub struct VcardURL {
     pub type_param: Option<Vec<String>>,
 
     pub mediatype: Option<String>,
-    pub value: url::Url,
+    pub value: String,
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID)]
+#[derive(Debug, PartialEq, AltID,Default)]
 pub struct FbURL {
     pub group: Option<String>,
     pub altid: Option<String>,
@@ -497,11 +506,11 @@ pub struct FbURL {
     pub type_param: Option<Vec<String>>,
 
     pub mediatype: Option<String>,
-    pub value: url::Url,
+    pub value: String,
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID)]
+#[derive(Debug, PartialEq, AltID,Default)]
 pub struct CalAdURI {
     pub group: Option<String>,
     pub altid: Option<String>,
@@ -511,11 +520,11 @@ pub struct CalAdURI {
     pub type_param: Option<Vec<String>>,
 
     pub mediatype: Option<String>,
-    pub value: url::Url,
+    pub value: String,
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID)]
+#[derive(Debug, PartialEq, AltID,Default)]
 pub struct CalURI {
     pub group: Option<String>,
     pub altid: Option<String>,
@@ -524,11 +533,11 @@ pub struct CalURI {
     pub value_data_type: Option<ValueDataType>,
     pub type_param: Option<Vec<String>>,
     pub mediatype: Option<String>,
-    pub value: url::Url,
+    pub value: String,
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID)]
+#[derive(Debug, PartialEq, AltID,Default)]
 pub struct Key {
     pub group: Option<String>,
 
@@ -544,14 +553,14 @@ pub struct Key {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID)]
+#[derive(Debug, PartialEq, AltID,Default)]
 pub struct Xml {
     pub altid: Option<String>,
     pub group: Option<String>,
     pub value: String,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 pub struct ProprietaryProperty {
     pub name: String,
     pub group: Option<String>,
