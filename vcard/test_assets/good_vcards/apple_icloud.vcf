@@ -1,0 +1,16 @@
+BEGIN:VCARD
+VERSION:3.0
+N:vom Tosafjord;Heinrich;;;
+FN:Heinrich vom Tosafjord
+ORG:Richter GBR;
+BDAY;VALUE=date:2017-01-03
+NOTE:ist eine Katze
+item1.ADR;TYPE=HOME;TYPE=pref:;;am Katzenklo;Katzenhausen;;23456;Germany
+item1.X-ABADR:de
+TEL;TYPE=CELL;TYPE=pref;TYPE=VOICE:017610101520
+item2.URL;TYPE=pref:https://www.example.com/heinrich
+item2.X-ABLABEL:_$!<HomePage>!$_
+EMAIL;TYPE=HOME;TYPE=pref;TYPE=INTERNET:heinrich@tosafjord.com
+PRODID:-//Apple Inc.//iCloud Web Address Book 2117B3//EN
+REV:2021-09-23T05:51:29Z
+END:VCARD

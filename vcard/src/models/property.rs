@@ -90,17 +90,18 @@ pub enum Property {
     Proprietary(ProprietaryProperty),
 }
 
-fn filter_and_transform(input: &str) -> Option<String> {
-    if input.is_empty() {
+fn filter_and_transform<A: AsRef<str>>(input: A) -> Option<String> {
+    if input.as_ref().is_empty() {
         None
     } else {
-        Some(String::from(input))
+        Some(String::from(input.as_ref()))
     }
 }
 
 fn parse_url<A: AsRef<str>>(input: A) -> Result<url::Url, VCardError> {
     input
         .as_ref()
+        .replace(r"\:", ":") // we do this because google incorrectly escapes colons
         .parse()
         .map_err(|e| VCardError::url_parse_error(e, input.as_ref()))
 }
@@ -128,6 +129,33 @@ fn parse_parameters(raw: &str) -> Result<Vec<Parameter>, VCardError> {
     let param = s.parse()?;
     result.push(param);
     Ok(result)
+}
+
+fn escaped_split(item: &str, split: char) -> impl Iterator<Item = String> {
+    let escape_char = '\\';
+    let mut result = Vec::new();
+    let mut escaped_value = false;
+    let mut buf = String::new();
+    for c in item.chars() {
+        // add escaped values no matter what
+        if escaped_value {
+            buf.push(c);
+            escaped_value = false;
+            continue;
+        }
+
+        if c == escape_char {
+            escaped_value = true
+        } else if c == split {
+            result.push(buf);
+            buf = String::new();
+        } else {
+            buf.push(c)
+        }
+    }
+    result.push(buf);
+
+    result.into_iter()
 }
 
 lazy_static::lazy_static! {
@@ -164,7 +192,7 @@ impl FromStr for Property {
                 reason: "no value found",
                 raw_line: line.into(),
             })?;
-        let name = name.trim_matches(char::from(0)).to_lowercase();
+        let name = name.trim_matches(char::from(0));
         let parameters = if let Some(raw_parameter) = parameter {
             parse_parameters(raw_parameter)?
         } else {
@@ -209,7 +237,7 @@ impl FromStr for Property {
         }
 
         let prop =
-            match &name[..] {
+            match &name.to_lowercase()[..] {
                 "begin" => Self::Begin { value },
                 "end" => Self::End { value },
                 "version" => {
@@ -241,8 +269,8 @@ impl FromStr for Property {
                     pref,
                 }),
                 "n" => {
-                    let mut split = value.split(";").map(|item| {
-                        item.split(";")
+                    let mut split = escaped_split(&value, ';').map(|item| {
+                        escaped_split(&item, ',')
                             .filter_map(filter_and_transform)
                             .collect::<Vec<String>>()
                     });
@@ -271,7 +299,7 @@ impl FromStr for Property {
                     language,
                     pid,
                     group,
-                    value: value.split(",").map(String::from).collect(),
+                    value: escaped_split(&value, ',').map(String::from).collect(),
                 }),
                 "photo" => Self::Photo(Photo {
                     group,
@@ -297,21 +325,27 @@ impl FromStr for Property {
                     value,
                 }),
                 "gender" => {
-                    let mut split = value.split(";");
-                    let value = if let Some(r) = split.next().map(Sex::from_str) {
-                        Some(r?)
-                    } else {
+                    let (sex, identity) =
+                        value
+                            .split_once(";")
+                            .ok_or_else(|| VCardError::InvalidSyntax {
+                                property: "Gender".into(),
+                                message: "gender property must include a semicolon (;)".into(),
+                            })?;
+                    let value = if sex.is_empty() {
                         None
+                    } else {
+                        Some(Sex::from_str(sex)?)
                     };
-                    let identity_component = split.next().map(String::from);
+                    let identity_component = Some(identity.to_string());
                     Self::Gender(Gender {
                         sex: value,
                         identity_component,
                     })
                 }
                 "adr" => {
-                    let mut split = value.split(";").map(|item| {
-                        item.split(",")
+                    let mut split = escaped_split(&value, ';').map(|item| {
+                        escaped_split(&item, ',')
                             .filter_map(filter_and_transform)
                             .collect::<Vec<String>>()
                     });
@@ -426,7 +460,9 @@ impl FromStr for Property {
                     value_data_type,
                     type_param,
                     group,
-                    value: value.split(";").filter_map(filter_and_transform).collect(),
+                    value: escaped_split(&value, ',')
+                        .filter_map(filter_and_transform)
+                        .collect(),
                 }),
                 "org" => Self::Org(Org {
                     altid,
@@ -437,7 +473,9 @@ impl FromStr for Property {
                     language,
                     sort_as,
                     group,
-                    value: value.split(";").filter_map(filter_and_transform).collect(),
+                    value: escaped_split(&value, ';')
+                        .filter_map(filter_and_transform)
+                        .collect(),
                 }),
                 "member" => Self::Member(Member {
                     altid,
@@ -527,9 +565,7 @@ impl FromStr for Property {
                     value_data_type,
                     type_param,
                     mediatype,
-                    value: value
-                        .parse()
-                        .map_err(|e| VCardError::url_parse_error(e, value))?,
+                    value: parse_url(value)?,
                 }),
                 "key" => Self::Key(Key {
                     group,
@@ -628,7 +664,7 @@ impl FromStr for Property {
                     }
 
                     Property::Proprietary(ProprietaryProperty {
-                        name,
+                        name: name.into(),
                         value: value.into(),
                         group,
                         parameters: proprietary_parameters,

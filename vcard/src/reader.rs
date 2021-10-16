@@ -1,9 +1,11 @@
-use std::{cell::RefCell, io::{self, BufReader, Read}, rc::Rc, str::FromStr};
+use std::{
+    cell::RefCell,
+    io::{self, BufReader, Read},
+    rc::Rc,
+    str::FromStr,
+};
 
-use crate::{Property, VCard, errors::VCardError};
-
-
-
+use crate::{errors::VCardError, Property, VCard};
 
 /// A reader that reads vcard properties one by one.
 ///
@@ -48,7 +50,7 @@ impl<R: io::Read> VCardReader<R> {
         Self {
             inner: PushbackReader {
                 inner: io::BufReader::new(input),
-                buf_index: 0,
+                num_returned_bytes: 0,
                 buf: [0, 0],
             },
             discard_buf: Rc::new(RefCell::new(Vec::with_capacity(1024))),
@@ -57,7 +59,8 @@ impl<R: io::Read> VCardReader<R> {
     }
 
     pub fn parse_vcard(&mut self) -> Result<VCard, VCardError> {
-        match self.read_property()? {
+        let (prop, more) = self.read_property()?;
+        match prop {
             Property::Begin { value } => {
                 if &value[..] != "VCARD" {
                     return Err(VCardError::InvalidBeginProperty);
@@ -66,10 +69,18 @@ impl<R: io::Read> VCardReader<R> {
             _ => return Err(VCardError::InvalidBeginProperty),
         }
 
-        let version = match self.read_property()? {
+        if !more {
+            return Err(VCardError::InvalidVersionProperty);
+        }
+        let (prop, more) = self.read_property()?;
+        let version = match prop {
             Property::Version(v) => v,
             _ => return Err(VCardError::InvalidVersionProperty),
         };
+
+        if !more {
+            return Err(VCardError::InvalidEndProperty);
+        }
 
         let mut result = VCard {
             version,
@@ -77,7 +88,7 @@ impl<R: io::Read> VCardReader<R> {
         };
 
         loop {
-            let prop = self.read_property()?;
+            let (prop, more) = self.read_property()?;
             match prop {
                 Property::Version(_) => {
                     return Err(VCardError::InvalidCardinality {
@@ -92,8 +103,8 @@ impl<R: io::Read> VCardReader<R> {
                     })
                 }
                 Property::End { value } => {
-                    if &value[..] != "VCARD" {
-                        return Err(VCardError::InvalidBeginProperty);
+                    if &value[..] != "VCARD" || more {
+                        return Err(VCardError::InvalidEndProperty);
                     }
                     return Ok(result);
                 }
@@ -176,24 +187,43 @@ impl<R: io::Read> VCardReader<R> {
     /// Reads the next Property from this vcard. In case the logical property line exceeds `max_logical_line_length`
     /// an `VCardError::MaxLineLengthExceeded` will be returned.
     /// see https://datatracker.ietf.org/doc/html/rfc6350#section-3.2 for more information about logical lines.
-    pub fn read_property(&mut self) -> Result<Property, VCardError> {
-        let line = self.read_logical_line()?;
-        Property::from_str(&line[..])
+    pub fn read_property(&mut self) -> Result<(Property, bool), VCardError> {
+        let (line, more) = self.read_logical_line()?;
+        Ok((Property::from_str(&line[..])?, more))
     }
-    fn read_logical_line(&mut self) -> Result<String, VCardError> {
+    fn read_logical_line(&mut self) -> Result<(String, bool), VCardError> {
         let mut logical_line_buf = Vec::new();
 
         // a logical line always starts with a new property declaration
-        self.read_physical_line(&mut logical_line_buf)?;
+        let result = self.read_physical_line(&mut logical_line_buf);
+
+        match result {
+            Ok(()) => {}
+            Err(e) => match e {
+                VCardError::Io(io_err) => match io_err.kind() {
+                    io::ErrorKind::UnexpectedEof => {
+                        // some implementations like google contacts and icloud do not respect the standard
+                        // and omit the trailing \r\n
+                        if b"END:VCARD" != &logical_line_buf[..] {
+                            return Err(io_err.into());
+                        }
+                    }
+                    _ => return Err(io_err.into()),
+                },
+                _ => return Err(e),
+            },
+        }
 
         loop {
             match self.inspect_next_line()? {
                 LineInspection::NewProperty => {
                     // a logical line expands only accross one property.
                     // if we encounter the declaration of the next property, the logical line has an end.
-                    return Ok(String::from_utf8(logical_line_buf)?);
+                    return Ok((String::from_utf8(logical_line_buf)?, true));
                 }
-                LineInspection::NoMoreContent => return Ok(String::from_utf8(logical_line_buf)?),
+                LineInspection::NoMoreContent => {
+                    return Ok((String::from_utf8(logical_line_buf)?, false))
+                }
                 LineInspection::Discard => self.discard_line()?,
                 LineInspection::LogicalLine => {
                     self.read_physical_line(&mut logical_line_buf)?;
@@ -234,52 +264,55 @@ impl<R: io::Read> VCardReader<R> {
     }
 }
 
-// This reader makes it possible to return a certain amount of bytes back to the reader itself.
+// This reader makes it possible to return a certain amount of bytes back to the reader itself (two to be precise).
 // The use case is the inspection of bytes in order to determine the continuation/end of logical lines in a vcard.
 struct PushbackReader<R> {
     inner: BufReader<R>,
     buf: [u8; 2],
-    buf_index: usize,
+
+    // num_buf_bytes can be 2 at maximum
+    num_returned_bytes: usize,
 }
 
 impl<R: io::Read> PushbackReader<R> {
+    // a maximum of two bytes can be returned.
+    // If more bytes are returned, the buffer will be filled again from the beginning
+    // and already present bytes will be discarded.
     fn return_byte(&mut self, b: u8) {
-        if self.buf_index > 1 {
-            self.buf_index = 0;
+        if self.num_returned_bytes >= 2 {
+            self.num_returned_bytes = 0;
         }
-        self.buf[self.buf_index] = b;
-        self.buf_index = self.buf_index + 1;
+        // this is safe because num_retruned_bytes can be at max 1 here.
+        self.buf[self.num_returned_bytes] = b;
+        self.num_returned_bytes = self.num_returned_bytes + 1;
     }
 
     fn return_bytes(&mut self, b: [u8; 2]) {
         self.buf = b;
-        self.buf_index = 2;
+        self.num_returned_bytes = 2;
     }
 }
 impl<R: io::Read> Read for PushbackReader<R> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        if self.buf_index == 0 {
+        if self.num_returned_bytes == 0 {
             return self.inner.read(buf);
         }
-        let first = &self.buf.as_ref()[0..self.buf_index];
+        let first = &self.buf.as_ref()[0..self.num_returned_bytes];
         let mut chain = first.chain(&mut self.inner);
         let result = chain.read(buf)?;
 
-        match result {
-            1 => {
-                self.buf[0] = self.buf[1];
-                let new_index = self.buf_index - 1;
-                self.buf_index = std::cmp::max(new_index, 0);
-            }
-            2 => {
-                self.buf_index = 0;
-            }
-            _ => {}
+        // if only one byte was read, we have to emulate a cursor move by removing the consumed byte.
+        // in case more than one bytes where read, we just invalidate the whole buffer.
+        if result == 1 {
+            self.buf[0] = self.buf[1];
+            self.num_returned_bytes = self.num_returned_bytes - 1;
+        } else {
+            self.num_returned_bytes = 0;
         }
+
         return Ok(result);
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -318,7 +351,7 @@ mod tests {
         ];
 
         for expected_property in expected.iter() {
-            let actual_property = reader.read_property()?;
+            let (actual_property, _more) = reader.read_property()?;
             assert_eq!(expected_property, &actual_property);
         }
         let mut reader = VCardReader::new_with_logical_line_limit(&testant[..], 36);
@@ -418,7 +451,7 @@ mod tests {
                 region: Vec::new(),
             }),
             Property::Proprietary(ProprietaryProperty {
-                name: "x-abadr".into(),
+                name: "X-ABADR".into(),
                 group: Some("item1".into()),
                 value: "de".into(),
                 parameters: Vec::new(),
@@ -442,7 +475,7 @@ mod tests {
                 mediatype: None,
             }),
             Property::Proprietary(ProprietaryProperty {
-                name: "x-ablabel".into(),
+                name: "X-ABLABEL".into(),
                 group: Some("item2".into()),
                 value: "_$!<HomePage>!$_".into(),
                 parameters: Vec::new(),
@@ -471,7 +504,7 @@ mod tests {
 
         for expected_prop in expected {
             let prop = match reader.read_property() {
-                Ok(p) => p,
+                Ok((p,_more)) => p,
                 Err(e) => {
                     panic!("expected prop {:#?} but got error {}", expected_prop, e);
                 }
