@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Display};
 
-use crate::{Alternative, Preferable, errors::VCardError};
+use crate::{errors::VCardError, Alternative, Preferable};
 
 pub struct MultiAltIDContainer<T: Alternative>(HashMap<String, AltIDContainer<T>>);
 
@@ -24,17 +24,17 @@ impl<T: Alternative> MultiAltIDContainer<T> {
         Self(HashMap::new())
     }
 
-    pub fn add_value(&mut self, value: T) -> Result<(), VCardError> {
+    pub fn add_value(&mut self, value: T){
         if self.0.contains_key(value.get_alt_id()) {
             let container = self.0.get_mut(value.get_alt_id()).unwrap();
-            container.add_value(value)?;
+            container
+                .add_value(value)
+                .expect("we have checked the key beforehand. What is this trickery!?");
         } else {
             let altid = value.get_alt_id().to_string();
             let container = AltIDContainer::from_vec(vec![value]);
             self.0.insert(altid, container);
         }
-
-        Ok(())
     }
 
     pub fn values(&self) -> &HashMap<String, AltIDContainer<T>> {
