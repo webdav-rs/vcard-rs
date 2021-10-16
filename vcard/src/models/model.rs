@@ -2,7 +2,9 @@ use std::{fmt::Display, str::FromStr};
 
 use vcard_macro::{vcard, AltID, Pref};
 
-use crate::{AltIDContainer, MultiAltIDContainer, Parameter, Pid, ValueDataType, errors::VCardError};
+use crate::{
+    errors::VCardError, AltIDContainer, MultiAltIDContainer, Parameter, Pid, ValueDataType,
+};
 
 pub trait Alternative {
     fn get_alt_id(&self) -> &str;
@@ -191,7 +193,7 @@ pub struct Anniversary {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID, Pref)]
+#[derive(Debug, PartialEq, AltID, Pref, Default)]
 pub struct Adr {
     pub group: Option<String>,
     pub altid: Option<String>,
@@ -347,7 +349,7 @@ pub struct Logo {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID, Pref)]
+#[derive(Debug, PartialEq, AltID, Pref, Default)]
 pub struct Org {
     pub group: Option<String>,
 
@@ -394,7 +396,7 @@ pub struct Related {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID)]
+#[derive(Debug, PartialEq, AltID, Default)]
 pub struct Categories {
     pub group: Option<String>,
 
@@ -408,7 +410,7 @@ pub struct Categories {
 }
 
 #[vcard]
-#[derive(Debug, PartialEq, AltID)]
+#[derive(Debug, PartialEq, AltID, Default)]
 pub struct Note {
     pub group: Option<String>,
 
@@ -577,7 +579,7 @@ impl Display for ProprietaryProperty {
 /// Represents a single VCard.
 ///
 /// For more informatin about the fields, see https://datatracker.ietf.org/doc/html/rfc6350#section-6
-#[derive(Default)]
+#[derive(Default, PartialEq, Debug)]
 pub struct VCard {
     pub version: Version,
     pub source: MultiAltIDContainer<Source>,
@@ -593,6 +595,7 @@ pub struct VCard {
 
     pub bday: AltIDContainer<BDay>,
     pub anniversary: AltIDContainer<Anniversary>,
+
     pub gender: Option<Gender>,
     pub adr: MultiAltIDContainer<Adr>,
     pub tel: MultiAltIDContainer<Tel>,
@@ -624,6 +627,105 @@ pub struct VCard {
     pub caladuri: MultiAltIDContainer<CalAdURI>,
 
     pub proprietary_properties: Vec<ProprietaryProperty>,
+}
+
+impl VCard {
+    pub fn new(version: VersionValue) -> VCardBuilder {
+        VCardBuilder {
+            vc: VCard {
+                version: Version { value: version },
+                ..Default::default()
+            },
+        }
+    }
+}
+
+macro_rules! multi_container_methods {
+    ($(($field:ident,$type:ident)),*) => {
+        $(
+        pub fn $field(mut self, $field: $type) -> Self {
+            self.vc.$field.add_value($field);
+            self
+        }
+        )*
+    };
+}
+
+macro_rules! container_methods {
+    ($(($field:ident,$type:ident)),*) => {
+        $(
+        pub fn $field(mut self, $field: $type) -> Result<Self, VCardError> {
+            self.vc.$field.add_value($field)?;
+            Ok(self)
+        }
+        )*
+    };
+}
+
+macro_rules! option_methods {
+    ($(($field:ident,$type:ident)),*) => {
+        $(
+            pub fn $field(mut self, $field: $type) -> Self {
+                self.vc.$field = Some($field);
+                self
+            }
+        )*
+
+    };
+}
+
+pub struct VCardBuilder {
+    vc: VCard,
+}
+
+impl VCardBuilder {
+    option_methods!(
+        (kind, Kind),
+        (gender, Gender),
+        (clientpidmap, ClientPidMap),
+        (prodid, ProdId),
+        (rev, Rev),
+        (uid, Uid)
+    );
+
+    container_methods!((n, N), (bday, BDay), (anniversary, Anniversary));
+
+    multi_container_methods!(
+        (xml, Xml),
+        (source, Source),
+        (fn_property, FN),
+        (nickname, Nickname),
+        (photo, Photo),
+        (adr, Adr),
+        (tel, Tel),
+        (email, Email),
+        (impp, Impp),
+        (lang, Lang),
+        (tz, Tz),
+        (geo, Geo),
+        (title, Title),
+        (role, Role),
+        (logo, Logo),
+        (org, Org),
+        (member, Member),
+        (related, Related),
+        (categories, Categories),
+        (note, Note),
+        (sound, Sound),
+        (url, VcardURL),
+        (key, Key),
+        (fburl, FbURL),
+        (caluri, CalURI),
+        (caladuri, CalAdURI)
+    );
+    pub fn proprietary(mut self, prop: ProprietaryProperty) -> Self {
+        self.vc.proprietary_properties.push(prop);
+        self
+    }
+
+    pub fn build(self) -> VCard {
+        self.vc
+    }
 }
 
 fn write_vcard_property<D: Display>(
@@ -687,8 +789,6 @@ impl Display for VCard {
         write!(f, "END:VCARD\r\n")
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {

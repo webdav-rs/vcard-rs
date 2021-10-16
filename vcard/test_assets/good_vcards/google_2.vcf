@@ -1,0 +1,25 @@
+BEGIN:VCARD
+VERSION:3.0
+FN:Dr. Heinrich Kasper Vom Tosafjord Von und Zu
+N:Vom Tosafjord;Heinrich;Kasper;Dr.;Von und Zu
+NICKNAME:Knödel
+X-PHONETIC-FIRST-NAME:Henry
+X-PHONETIC-LAST-NAME:VTF
+EMAIL;TYPE=INTERNET;TYPE=HOME:heinrich@example.com
+item1.X-JABBER:heinrich@jabber.com
+item1.X-ABLabel:
+TEL;TYPE=HOME:00 0000
+ADR;TYPE=HOME:7;;Auf dem Land 3;Achundkrach;;550201;DE;Auf dem Land 3\n7\n5
+ 50201 Achundkrach\nDE
+item2.ORG:test gmbh;it
+item2.X-ABLabel:
+item3.TITLE:manager
+item3.X-ABLabel:
+BDAY:20180301
+item4.URL:www.example.com
+item4.X-ABLabel:BLOG
+item5.X-ABRELATEDNAMES:fiona
+item5.X-ABLabel:_$!<Sister>!$_
+NOTE:ist eine katze\nirgendeinlabel: testfeld
+CATEGORIES:myContacts
+END:VCARD

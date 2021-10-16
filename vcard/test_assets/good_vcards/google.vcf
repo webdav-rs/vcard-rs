@@ -1,0 +1,14 @@
+BEGIN:VCARD
+VERSION:3.0
+FN:Judith
+N:;Judith;;;
+EMAIL;TYPE=INTERNET;TYPE=HOME:test@example.com
+EMAIL;TYPE=INTERNET:test2@example.com
+TEL;TYPE=CELL:+49123456789
+TEL;TYPE=HOME:09999123456789
+item1.URL:http\://www.google.com/profiles/xxxxx
+item1.X-ABLabel:PROFILE
+PHOTO:https://lh3.example.com/-xxxx/xxxxx
+ A/xxxxx/photo.jpg
+CATEGORIES:Freunde,myContacts,starred
+END:VCARD

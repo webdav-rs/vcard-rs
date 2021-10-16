@@ -73,6 +73,11 @@ pub enum VCardError {
         expected_altid: String,
         actual_altid: String,
     },
+    #[error("invalid syntax for property {property}: {message}")]
+    InvalidSyntax{
+        message: String,
+        property: String,
+    }
 }
 
 impl VCardError {
