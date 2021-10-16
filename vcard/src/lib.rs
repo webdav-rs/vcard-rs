@@ -22,8 +22,13 @@ pub trait Alternative {
 pub trait Preferable {
     fn get_pref(&self) -> u8;
 }
-
 pub struct MultiAltIDContainer<T: Alternative>(HashMap<String, AltIDContainer<T>>);
+
+impl<T: Alternative> Default for MultiAltIDContainer<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl<T: Alternative + Display> Display for MultiAltIDContainer<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -86,6 +91,7 @@ impl<T: Alternative + Preferable> MultiAltIDContainer<T> {
 
 /// In vcard, if multiple entries share the same type and altid, they are considered
 /// to be one record. This means, all entries in an `AltIDContainer` are considered one record as well.
+#[derive(Default)]
 pub struct AltIDContainer<T: Alternative>(Vec<T>);
 
 impl<T> Display for AltIDContainer<T>
@@ -164,10 +170,10 @@ where
     }
 }
 
-
 /// Represents a single VCard.
-/// 
+///
 /// For more informatin about the fields, see https://datatracker.ietf.org/doc/html/rfc6350#section-6
+#[derive(Default)]
 pub struct VCard {
     pub version: Version,
     pub source: MultiAltIDContainer<Source>,
@@ -212,6 +218,8 @@ pub struct VCard {
     pub fburl: MultiAltIDContainer<FbURL>,
     pub caluri: MultiAltIDContainer<CalURI>,
     pub caladuri: MultiAltIDContainer<CalAdURI>,
+
+    pub proprietary_properties: Vec<ProprietaryProperty>,
 }
 
 fn write_vcard_property<D: Display>(
@@ -224,7 +232,7 @@ fn write_vcard_property<D: Display>(
     Ok(())
 }
 
-impl<'a> Display for VCard {
+impl Display for VCard {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "BEGIN:VCARD\r\n")?;
         write_vcard_property(f, &Some(&self.version))?;
@@ -269,6 +277,9 @@ impl<'a> Display for VCard {
         self.fburl.fmt(f)?;
         self.caluri.fmt(f)?;
         self.caladuri.fmt(f)?;
+        for prop in self.proprietary_properties.iter() {
+            prop.fmt(f)?;
+        }
         write!(f, "END:VCARD\r\n")
     }
 }
@@ -321,6 +332,15 @@ pub enum ValueDataType {
     #[strum(serialize = "language-tag")]
     LanguageTag,
     Proprietary(String),
+}
+
+impl Display for ValueDataType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Proprietary(p) => write!(f, "{}", p),
+            _ => write!(f, "{}", self.as_ref()),
+        }
+    }
 }
 
 const URI: &str = "uri";
@@ -909,18 +929,47 @@ pub struct Xml {
     pub value: String,
 }
 
+#[derive(Debug, PartialEq)]
+pub struct ProprietaryProperty {
+    pub name: String,
+    pub group: Option<String>,
+    pub value: String,
+    pub parameters: Vec<Parameter>,
+}
+
+impl Display for ProprietaryProperty {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(grp) = &self.group {
+            write!(f, "{}.", grp)?;
+        }
+        write!(f, "{}", self.name)?;
+
+        for param in self.parameters.iter() {
+            write!(f, ";{}", param.to_string())?;
+        }
+
+        write!(f, ":{}\r\n", self.value)?;
+
+        Ok(())
+    }
+}
+
 #[derive(strum_macros::AsRefStr, Debug, PartialEq)]
 pub enum Property {
     #[strum(serialize = "begin")]
-    Begin { value: String },
+    Begin {
+        value: String,
+    },
     #[strum(serialize = "end")]
-    End { value: String },
+    End {
+        value: String,
+    },
     #[strum(serialize = "version")]
     Version(Version),
     #[strum(serialize = "source")]
     Source(Source),
     #[strum(serialize = "kind")]
-    Kind(KindValue),
+    Kind(Kind),
     #[strum(serialize = "fn")]
     FN(FN),
     #[strum(serialize = "n")]
@@ -987,12 +1036,7 @@ pub enum Property {
     CalUri(CalURI),
     #[strum(serialize = "xml")]
     Xml(Xml),
-    Proprietary {
-        name: String,
-        group: Option<String>,
-        value: String,
-        parameters: Vec<Parameter>,
-    },
+    Proprietary(ProprietaryProperty),
 }
 
 fn filter_and_transform(input: &str) -> Option<String> {
@@ -1104,7 +1148,10 @@ impl FromStr for Property {
                     group,
                     value: parse_url(value)?,
                 }),
-                "kind" => Self::Kind(value.parse()?),
+                "kind" => Self::Kind(Kind {
+                    group,
+                    value: value.parse()?,
+                }),
                 "fn" => Self::FN(FN {
                     group,
                     altid,
@@ -1501,12 +1548,12 @@ impl FromStr for Property {
                         proprietary_parameters.push(Parameter::Language(l));
                     }
 
-                    Property::Proprietary {
+                    Property::Proprietary(ProprietaryProperty {
                         name,
                         value: value.into(),
                         group,
                         parameters: proprietary_parameters,
-                    }
+                    })
                 }
             };
         Ok(prop)
@@ -1528,6 +1575,28 @@ pub enum Parameter {
     Geo(String),
     TimeZone(String),
     Proprietary(String),
+}
+
+impl Display for Parameter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Label(l) => write!(f, "LABEL={}", l)?,
+            Self::Language(l) => write!(f, "LANGUAGE={}", l)?,
+            Self::Value(v) => write!(f, "VALUE={}", v.to_string())?,
+            Self::Pref(p) => write!(f, "PREF={}", p)?,
+            Self::AltId(a) => write!(f, "ALTID={}", a)?,
+            Self::Pid(p) => write!(f, "PID={}", p)?,
+            Self::Type(t) => write!(f, "TYPE={}", t.join(","))?,
+            Self::MediaType(m) => write!(f, "MEDIATYPE={}", m)?,
+            Self::CalScale(c) => write!(f, "CALSCALE={}", c)?,
+            Self::SortAs(s) => write!(f, "SORT-AS={}", s.join(","))?,
+            Self::Geo(g) => write!(f, "GEO={}", g)?,
+            Self::TimeZone(t) => write!(f, "TZ={}", t)?,
+            Self::Proprietary(p) => write!(f, "{}", p)?,
+        }
+
+        Ok(())
+    }
 }
 
 const LANGUAGE: &str = "language";
@@ -1622,6 +1691,18 @@ enum LineInspection {
     NewProperty,
 }
 
+macro_rules! add_single_value {
+    ($result:expr,$prop:ident,$new_val:expr) => {{
+        if $result.$prop.is_some() {
+            return Err(VCardError::InvalidCardinality {
+                expected: 1,
+                property: stringify!($prop).into(),
+            });
+        }
+        $result.$prop = Some($new_val);
+    }};
+}
+
 impl<R: io::Read> VCardReader<R> {
     /// Creates a new `VCardReader` with the default logical line limit of 5000
     pub fn new(input: R) -> Self {
@@ -1641,30 +1722,87 @@ impl<R: io::Read> VCardReader<R> {
         }
     }
 
-    // pub fn parse_vcard(&mut self) -> Result<VCard, VCardError> {
-    //     let begin_property = self.read_property()?;
-    //     match begin_property {
-    //         Property::Begin { value } => {
-    //             if &value[..] != "VCARD" {
-    //                 return Err(VCardError::InvalidBeginProperty);
-    //             }
-    //         }
-    //         _ => return Err(VCardError::InvalidBeginProperty),
-    //     }
+    pub fn parse_vcard(&mut self) -> Result<VCard, VCardError> {
+        match self.read_property()? {
+            Property::Begin { value } => {
+                if &value[..] != "VCARD" {
+                    return Err(VCardError::InvalidBeginProperty);
+                }
+            }
+            _ => return Err(VCardError::InvalidBeginProperty),
+        }
 
-    //     loop {
-    //         let prop = self.read_property()?;
-    //         match prop {
-    //             Property::Begin { value: _ } => {
-    //                 return Err(VCardError::InvalidCardinality {
-    //                     expected: 1,
-    //                     property: "BEGIN".into(),
-    //                 })
-    //             }
-    //             _ => unimplemented!(),
-    //         }
-    //     }
-    // }
+        let version = match self.read_property()? {
+            Property::Version(v) => v,
+            _ => return Err(VCardError::InvalidVersionProperty),
+        };
+
+        let mut result = VCard {
+            version,
+            ..Default::default()
+        };
+
+        loop {
+            let prop = self.read_property()?;
+            match prop {
+                Property::Version(_) => {
+                    return Err(VCardError::InvalidCardinality {
+                        expected: 1,
+                        property: "VERSION".into(),
+                    })
+                }
+                Property::Begin { value: _ } => {
+                    return Err(VCardError::InvalidCardinality {
+                        expected: 1,
+                        property: "BEGIN".into(),
+                    })
+                }
+                Property::End { value } => {
+                    if &value[..] != "VCARD" {
+                        return Err(VCardError::InvalidBeginProperty);
+                    }
+                    return Ok(result);
+                }
+
+                Property::Source(s) => result.source.add_value(s)?,
+                Property::Kind(k) => add_single_value!(result, kind, k),
+                Property::Xml(x) => result.xml.add_value(x)?,
+                Property::FN(f) => result.fn_property.add_value(f)?,
+                Property::N(n) => result.n.add_value(n)?,
+                Property::NickName(n) => result.nickname.add_value(n)?,
+                Property::Photo(p) => result.photo.add_value(p)?,
+                Property::BDay(b) => result.bday.add_value(b)?,
+                Property::Anniversary(a) => result.anniversary.add_value(a)?,
+                Property::Gender(g) => add_single_value!(result, gender, g),
+                Property::Adr(a) => result.adr.add_value(a)?,
+                Property::Tel(t) => result.tel.add_value(t)?,
+                Property::Email(e) => result.email.add_value(e)?,
+                Property::Impp(i) => result.impp.add_value(i)?,
+                Property::Lang(l) => result.lang.add_value(l)?,
+                Property::Tz(t) => result.tz.add_value(t)?,
+                Property::Geo(g) => result.geo.add_value(g)?,
+                Property::Title(t) => result.title.add_value(t)?,
+                Property::Role(r) => result.role.add_value(r)?,
+                Property::Logo(l) => result.logo.add_value(l)?,
+                Property::Org(o) => result.org.add_value(o)?,
+                Property::Member(m) => result.member.add_value(m)?,
+                Property::Related(r) => result.related.add_value(r)?,
+                Property::Categories(c) => result.categories.add_value(c)?,
+                Property::Note(n) => result.note.add_value(n)?,
+                Property::ProdId(p) => add_single_value!(result, prodid, p),
+                Property::Rev(r) => add_single_value!(result, rev, r),
+                Property::Sound(s) => result.sound.add_value(s)?,
+                Property::Uid(u) => add_single_value!(result, uid, u),
+                Property::ClientPidMap(c) => add_single_value!(result, clientpidmap, c),
+                Property::Url(u) => result.url.add_value(u)?,
+                Property::Key(k) => result.key.add_value(k)?,
+                Property::FbUrl(f) => result.fburl.add_value(f)?,
+                Property::CalUri(c) => result.caluri.add_value(c)?,
+                Property::CalAdUri(c) => result.caladuri.add_value(c)?,
+                Property::Proprietary(p) => result.proprietary_properties.push(p),
+            }
+        }
+    }
 
     fn inspect_next_line(&mut self) -> Result<LineInspection, VCardError> {
         let mut buf = [0, 0];
@@ -1976,12 +2114,12 @@ mod tests {
                 country: vec!["Germany".into()],
                 region: Vec::new(),
             }),
-            Property::Proprietary {
+            Property::Proprietary(ProprietaryProperty {
                 name: "x-abadr".into(),
                 group: Some("item1".into()),
                 value: "de".into(),
                 parameters: Vec::new(),
-            },
+            }),
             Property::Tel(Tel {
                 type_param: Some(vec!["CELL".into(), "pref".into(), "VOICE".into()]),
                 value_data_type: None,
@@ -2000,12 +2138,12 @@ mod tests {
                 value_data_type: None,
                 mediatype: None,
             }),
-            Property::Proprietary {
+            Property::Proprietary(ProprietaryProperty {
                 name: "x-ablabel".into(),
                 group: Some("item2".into()),
                 value: "_$!<HomePage>!$_".into(),
                 parameters: Vec::new(),
-            },
+            }),
             Property::Email(Email {
                 group: None,
                 type_param: Some(vec!["HOME".into(), "pref".into(), "INTERNET".into()]),
