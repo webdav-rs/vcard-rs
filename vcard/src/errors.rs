@@ -59,17 +59,20 @@ pub enum VCardError {
     #[error("first property of a vcard must be BEGIN:VCARD")]
     InvalidBeginProperty,
 
+    #[error("second property of a vcard must be VERSION:3.0 or VERSION:4.0")]
+    InvalidVersionProperty,
+
+    #[error("last property of a vcard must be END:VCARD")]
+    InvalidEndProperty,
+
     #[error("only {expected} amount of {property} are valid in a vcard")]
-    InvalidCardinality{
-        expected: u64,
-        property: String,
-    },
+    InvalidCardinality { expected: u64, property: String },
 
     #[error("expected item to have altid {expected_altid}, but got {actual_altid}")]
-    InvalidAltID{
+    InvalidAltID {
         expected_altid: String,
         actual_altid: String,
-    }
+    },
 }
 
 impl VCardError {
