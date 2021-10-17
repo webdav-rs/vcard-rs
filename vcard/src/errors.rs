@@ -44,12 +44,6 @@ pub enum VCardError {
     #[error("Invalid gender {0}, expected one of (m,f,o,n,u)")]
     InvalidGenderError(String),
 
-    #[error("Error parsing URL {raw_url}: {original_error}")]
-    UrlParseError {
-        raw_url: String,
-        original_error: url::ParseError,
-    },
-
     #[error("Unknown parameter {0}")]
     UnknownParameter(String),
 

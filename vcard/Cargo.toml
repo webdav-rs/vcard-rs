@@ -8,8 +8,6 @@ edition = "2018"
 thiserror= "1"
 regex = "1"
 lazy_static="1"
-url = "2"
-chrono = "0.4"
 strum = { version = "0.22"}
 strum_macros = "0.22"
 vcard_macro = {path = "../vcard_macro"}

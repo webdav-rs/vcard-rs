@@ -464,7 +464,7 @@ mod tests {
                 altid: None,
                 value: "017610101520".into(),
             }),
-            Property::Url(VcardURL {
+            Property::Url(Url {
                 group: Some("item2".into()),
                 type_param: Some(vec!["pref".into()]),
                 value: "https://www.example.com/heinrich".parse()?,

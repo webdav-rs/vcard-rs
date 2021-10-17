@@ -76,7 +76,7 @@ pub enum Property {
     #[strum(serialize = "clientidmap")]
     ClientPidMap(ClientPidMap),
     #[strum(serialize = "url")]
-    Url(VcardURL),
+    Url(Url),
     #[strum(serialize = "key")]
     Key(Key),
     #[strum(serialize = "fburl")]
@@ -549,7 +549,7 @@ impl FromStr for Property {
                         group,
                     })
                 }
-                "url" => Self::Url(VcardURL {
+                "url" => Self::Url(Url {
                     group,
                     altid,
                     pid,

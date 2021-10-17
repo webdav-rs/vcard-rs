@@ -4,7 +4,7 @@ use vcard::*;
 
 #[test]
 
-fn test() -> Result<(), Box<dyn Error>> {
+fn test_vcards_from_big_services() -> Result<(), Box<dyn Error>> {
     let mut dir = PathBuf::new();
     dir.push(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -58,15 +58,11 @@ fn test() -> Result<(), Box<dyn Error>> {
                 value: "017610101520".into(),
                 ..Default::default()
             })
-            .url(VcardURL {
+            .url(Url {
                 group: Some("item2".into()),
                 type_param: Some(vec!["pref".into()]),
-                value: "https://www.example.com/heinrich".parse()?,
-                altid: None,
-                pid: None,
-                pref: None,
-                value_data_type: None,
-                mediatype: None,
+                value: "https://www.example.com/heinrich".into(),
+                ..Default::default()
             })
             .proprietary(ProprietaryProperty {
                 name: "X-ABLABEL".into(),
@@ -121,15 +117,10 @@ fn test() -> Result<(), Box<dyn Error>> {
                 value: "09999123456789".into(),
                 ..Default::default()
             })
-            .url(VcardURL {
+            .url(Url {
                 group: Some("item1".into()),
                 value: "http\\://www.google.com/profiles/xxxxx".into(),
-                altid: None,
-                pid: None,
-                pref: None,
-                value_data_type: None,
-                mediatype: None,
-                type_param: None,
+                ..Default::default()
             })
             .proprietary(ProprietaryProperty {
                 group: Some("item1".into()),
@@ -237,7 +228,7 @@ fn test() -> Result<(), Box<dyn Error>> {
                 value: "20180301".into(),
                 ..Default::default()
             })?
-            .url(VcardURL {
+            .url(Url {
                 group: Some("item4".into()),
                 value: "www.example.com".parse()?,
                 altid: None,
@@ -283,51 +274,62 @@ fn test() -> Result<(), Box<dyn Error>> {
         let mut reader = VCardReader::new(&mut f);
 
         let actual = reader.parse_vcard()?;
-        assert_eq!(expected.version, actual.version);
-        assert_eq!(expected.source, actual.source);
 
-        assert_eq!(expected.kind, actual.kind);
-        assert_eq!(expected.xml, actual.xml);
-        assert_eq!(expected.fn_property, actual.fn_property);
-        assert_eq!(expected.n, actual.n);
-        assert_eq!(expected.nickname, actual.nickname);
-        assert_eq!(expected.photo, actual.photo);
-        assert_eq!(expected.bday, actual.bday);
-        assert_eq!(expected.anniversary, actual.anniversary);
-        assert_eq!(expected.gender, actual.gender);
+        compare_vcards(&expected, &actual);
 
-        assert_eq!(expected.adr, actual.adr);
-        assert_eq!(expected.tel, actual.tel);
-        assert_eq!(expected.email, actual.email);
-        assert_eq!(expected.impp, actual.impp);
-        assert_eq!(expected.lang, actual.lang);
-        assert_eq!(expected.tz, actual.tz);
-        assert_eq!(expected.geo, actual.geo);
-        assert_eq!(expected.title, actual.title);
-        assert_eq!(expected.role, actual.role);
+        // we test the Serialization by feeding it back into our reader.
+        let new_val = expected.to_string();
+        let new_card = VCardReader::new(new_val.as_bytes()).parse_vcard()?;
 
-        assert_eq!(expected.logo, actual.logo);
-        assert_eq!(expected.org, actual.org);
-        assert_eq!(expected.member, actual.member);
-        assert_eq!(expected.related, actual.related);
-        assert_eq!(expected.categories, actual.categories);
-        assert_eq!(expected.note, actual.note);
-        assert_eq!(expected.prodid, actual.prodid);
-        assert_eq!(expected.rev, actual.rev);
-        assert_eq!(expected.sound, actual.sound);
-
-        assert_eq!(expected.uid, actual.uid);
-        assert_eq!(expected.clientpidmap, actual.clientpidmap);
-        assert_eq!(expected.url, actual.url);
-        assert_eq!(expected.key, actual.key);
-        assert_eq!(expected.fburl, actual.fburl);
-        assert_eq!(expected.caluri, actual.caluri);
-        assert_eq!(expected.caladuri, actual.caladuri);
-        assert_eq!(
-            expected.proprietary_properties,
-            actual.proprietary_properties
-        );
+        compare_vcards(&expected, &new_card);
     }
 
     Ok(())
+}
+
+fn compare_vcards(expected: &VCard, actual: &VCard) {
+    assert_eq!(expected.version, actual.version);
+    assert_eq!(expected.source, actual.source);
+
+    assert_eq!(expected.kind, actual.kind);
+    assert_eq!(expected.xml, actual.xml);
+    assert_eq!(expected.fn_property, actual.fn_property);
+    assert_eq!(expected.n, actual.n);
+    assert_eq!(expected.nickname, actual.nickname);
+    assert_eq!(expected.photo, actual.photo);
+    assert_eq!(expected.bday, actual.bday);
+    assert_eq!(expected.anniversary, actual.anniversary);
+    assert_eq!(expected.gender, actual.gender);
+
+    assert_eq!(expected.adr, actual.adr);
+    assert_eq!(expected.tel, actual.tel);
+    assert_eq!(expected.email, actual.email);
+    assert_eq!(expected.impp, actual.impp);
+    assert_eq!(expected.lang, actual.lang);
+    assert_eq!(expected.tz, actual.tz);
+    assert_eq!(expected.geo, actual.geo);
+    assert_eq!(expected.title, actual.title);
+    assert_eq!(expected.role, actual.role);
+
+    assert_eq!(expected.logo, actual.logo);
+    assert_eq!(expected.org, actual.org);
+    assert_eq!(expected.member, actual.member);
+    assert_eq!(expected.related, actual.related);
+    assert_eq!(expected.categories, actual.categories);
+    assert_eq!(expected.note, actual.note);
+    assert_eq!(expected.prodid, actual.prodid);
+    assert_eq!(expected.rev, actual.rev);
+    assert_eq!(expected.sound, actual.sound);
+
+    assert_eq!(expected.uid, actual.uid);
+    assert_eq!(expected.clientpidmap, actual.clientpidmap);
+    assert_eq!(expected.url, actual.url);
+    assert_eq!(expected.key, actual.key);
+    assert_eq!(expected.fburl, actual.fburl);
+    assert_eq!(expected.caluri, actual.caluri);
+    assert_eq!(expected.caladuri, actual.caladuri);
+    assert_eq!(
+        expected.proprietary_properties,
+        actual.proprietary_properties
+    );
 }

@@ -483,7 +483,7 @@ pub struct ClientPidMap {
 
 #[vcard]
 #[derive(Debug, PartialEq, AltID,Default)]
-pub struct VcardURL {
+pub struct Url {
     pub group: Option<String>,
     pub altid: Option<String>,
     pub pid: Option<Pid>,
@@ -629,7 +629,7 @@ pub struct VCard {
     pub uid: Option<Uid>,
     pub clientpidmap: Option<ClientPidMap>,
 
-    pub url: MultiAltIDContainer<VcardURL>,
+    pub url: MultiAltIDContainer<Url>,
     pub key: MultiAltIDContainer<Key>,
     pub fburl: MultiAltIDContainer<FbURL>,
     pub caluri: MultiAltIDContainer<CalURI>,
@@ -721,7 +721,7 @@ impl VCardBuilder {
         (categories, Categories),
         (note, Note),
         (sound, Sound),
-        (url, VcardURL),
+        (url, Url),
         (key, Key),
         (fburl, FbURL),
         (caluri, CalURI),

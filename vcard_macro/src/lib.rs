@@ -94,10 +94,7 @@ pub fn vcard(_metadata: TokenStream, input: TokenStream) -> TokenStream {
     match item {
         Item::Struct(ref struct_item) => match &struct_item.fields {
             Fields::Named(fields) => {
-                let mut struct_name = struct_item.ident.to_string().to_uppercase();
-                if struct_name == "VCARDURL" {
-                    struct_name = "URL".into();
-                }
+                let struct_name = struct_item.ident.to_string().to_uppercase();
                 let mut grp_stmt = quote! {
                     let name = #struct_name;
                     write!(f,"{}",name)?;
@@ -202,7 +199,12 @@ pub fn vcard(_metadata: TokenStream, input: TokenStream) -> TokenStream {
                 }
 
                 let value_stmt = match &struct_name[..] {
-                    "ORG" | "CATEGORIES" | "NICKNAME" => {
+                    "ORG" => {
+                        quote! {
+                            write!(f,":{}\r\n",self.value.join(";"))?;
+                        }
+                    }
+                    "CATEGORIES" | "NICKNAME" => {
                         quote! {
                             write!(f,":{}\r\n",self.value.join(","))?;
                         }
